@@ -1,0 +1,6 @@
+# Keep source and draft materials out of this portfolio repository.
+*.pdf
+source*
+original*
+draft*
+notes*
