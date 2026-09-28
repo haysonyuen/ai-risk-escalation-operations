@@ -62,6 +62,15 @@
       ],
       "used_for_tuning": false,
       "note": "First held-out runs after rules-v1.1 was finalized on dev. rules-v1.1 regressed P0/P1 recall (EVAL-048). No rule changes were made from these results."
+    },
+    {
+      "date": "2026-09-28",
+      "runs": [
+        "rules-v1.0 held_out",
+        "rules-v1.1 held_out"
+      ],
+      "used_for_tuning": false,
+      "note": "Re-run with controls-v1.1 (transcript role-label false-positive fix, motivated by seeded demo case INC-1001, not by held-out results). Change on held-out: EVAL-066 is no longer flagged for review - its earlier flag was an accidental C4 false positive. No rules were changed."
     }
   ]
 }

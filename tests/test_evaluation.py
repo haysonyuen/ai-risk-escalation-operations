@@ -71,6 +71,7 @@ def test_fault_injection_run_is_labeled_and_controls_hold():
 def test_regression_gate_flags_injected_rule_regression():
     base = evaluation.run_eval("rules", "rules-v1.1", split="all", write=False)
     bad = evaluation.run_eval("rules", "rules-v1.1-fault-demo", split="all", write=False)
+    assert bad["evaluation_kind"] == "fault_injection"
     chk = monitoring.regression_check(base, bad)
     assert chk["alert"]
     assert any(r["metric"].startswith("Mandatory review") or r["metric"].startswith("P0/P1") for r in chk["regressions"])

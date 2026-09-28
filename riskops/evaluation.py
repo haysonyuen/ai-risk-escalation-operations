@@ -28,6 +28,7 @@ from pathlib import Path
 from . import config
 from .assessment import CONTROLS_VERSION, assess_incident
 from .providers import AnthropicProvider, FaultInjectionProvider, OfflineSimulationProvider
+from .rules import load_rules
 from .schemas import SEVERITIES, IncidentIntake
 
 HIGH = {"P0", "P1"}
@@ -93,6 +94,12 @@ def ratio(num: int, den: int, why_undefined: str = "") -> dict:
 
 
 def _severity_metrics(preds: list[dict], key: str) -> dict:
+    if not preds:
+        why = "no schema-valid provider assessments in this run"
+        return {k: ratio(0, 0, why) for k in ("exact_match", "within_acceptable_range", "p0p1_precision", "p0p1_recall")} | {
+            "p0p1_missed_where_all_acceptable_tiers_are_p0p1": None, "under_severity_outside_range": None,
+            "over_severity_outside_range": None, "confusion_matrix_expected_rows_predicted_cols":
+            {e: {p: 0 for p in SEVERITIES + ["none"]} for e in SEVERITIES}}
     labels = [p["label"] for p in preds]
     pred = [p[key] for p in preds]
     n = len(preds)
@@ -192,7 +199,10 @@ def run_eval(system: str = "rules", rule_version: str = "rules-v1.0", prompt_ver
     metrics = score(preds)
 
     kind = {"rules": "rules_only_baseline", "live": "live_model"}.get(system, "fault_injection")
-    run_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}-{kind}-{rule_version}-{split}-{uuid.uuid4().hex[:4]}"
+    if "FAULT" in load_rules(rule_version).get("status", ""):
+        kind = "fault_injection"  # a deliberately broken rule set is a fault-injection test, not a baseline
+    tag = system.replace(":", "-")
+    run_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}-{kind}-{tag}-{rule_version}-{split}-{uuid.uuid4().hex[:4]}"
     failures = [
         {"incident_id": p["incident_id"], "family": p["label"]["scenario_family"],
          "expected": p["label"]["expected_severity"], "acceptable": p["label"]["acceptable_severities"],
