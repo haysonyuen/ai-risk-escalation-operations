@@ -1,0 +1,45 @@
+# Requirements → evidence
+
+The **Evidence** column points to code, tests (in `tests/`) or results (in `evaluation/results/` and `docs/screenshots/`). **Status** separates what is implemented and verified from what is simulated or pending.
+
+| # | Requirement | Code | Tests / results | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Eight-stage process | `workflow.py` (`STATUSES`, `STAGE`, `TRANSITIONS`) | `test_invalid_transitions_rejected`, `test_closure_requires_signoff_role_fields_and_state`; screenshots 01–09 | Implemented |
+| 1 | P0–P3 meanings and postures preserved | `docs/framework.md`, Rules page "Severity framework", `playbooks/rules_*.json` | `test_framework_p0_example_is_p0` | Implemented |
+| 1 | Configurable SLA targets labeled as prototype assumptions | `config/sla.json`, `config.sla_minutes` | Queue deadlines, Dashboard page | Implemented; values are assumptions |
+| 1 | Impact, evidence quality, AI recommendation and human severity kept separate | `rules.py` (impact/quality/confidence), `assessment.py` (`model_severity`, `controlled_severity`), `incidents.human_severity` | `test_reassessment_preserves_human_decision_and_history`; screenshot 03 | Implemented |
+| 1 | Low confidence does not imply low severity | `FLOOR-01` (v1.1), control C5 | `test_low_confidence_potentially_severe_is_not_low_severity`; dev EVAL-036 fixed | Implemented (limitation: xfail test) |
+| 2 | Queue with filters, deadlines, overdue flags, pending decisions, AI vs human, source | `app/page_queue.py`, `monitoring.queue`, `workflow.next_actions` | screenshot 01; UI smoke test | Implemented |
+| 2 | Incident workspace (report, evidence, AI assessment, rules, timeline, routing, next steps, decisions, containment, drafts, audit, closure) | `app/page_case.py`, `workflow.next_actions/closure_blockers` | screenshots 02–09; `scripts/ui_walkthrough.py`; `test_next_actions_guide_by_status_and_role`, `test_closure_blockers_match_close_incident_checks`; [ux_review.md](ux_review.md) | Implemented |
+| 2 | Quality view (denominators, confusion matrix, routing errors, failures, version comparison, overrides by reason, limitations) | `app/view_quality.py`, `evaluation.py` | screenshot 12 | Implemented |
+| 2 | Rules and playbooks with versions and a controlled rule update | `app/view_rules.py`, `workflow.change_rule_version` | screenshot 10; `test_reassessment_preserves_human_decision_and_history` (Incident Lead only) | Implemented |
+| 3 | Manual entry and JSON import; explicit unknowns | `app/page_intake.py`, `workflow.import_json`, `schemas.IncidentIntake` | `test_json_import_reports_invalid_records_without_partial_import`, `test_future_reported_at_is_rejected`; screenshot 02 | Implemented |
+| 3 | Duplicate/related suggestions with explanation and reviewer confirmation; no merging | `dedup.py`, `workflow.decide_link` | `test_duplicate_linking_preserves_evidence_and_status` | Implemented |
+| 3 | Incident text treated as untrusted | `injection.py`, control C4, prompt delimiters | `test_embedded_instructions_*`, `test_model_that_obeys_embedded_text_is_contained_by_controls`, `test_transcript_role_labels_*` | Implemented; over-escalation gap documented |
+| 4 | Provider abstraction: offline mode and optional live Anthropic mode | `providers/` | `test_live_provider_*` (mocked client) | Offline implemented; live implemented but **not run against the API** |
+| 4 | Offline outputs labeled; no silent fallback | `ProviderResult.provider_kind`, UI badges, `evaluation._provider` | `test_live_provider_without_key_fails_visibly`, `test_live_eval_refuses_without_key` | Implemented |
+| 4 | Schema-validated assessment with all required fields | `schemas.AssessmentOutput` (`extra="forbid"`) | `test_schema_rejects_extra_approval_field` | Implemented |
+| 4 | Evidence references validated; valid ≠ supported; support-review mechanism | control C2, `workflow.record_claim_review`, worksheet CSV | `test_invalid_evidence_references_are_flagged_not_trusted`, `test_valid_reference_is_not_treated_as_proof`, `test_claim_worksheet_summary_counts_only_reviewed_rows` | Implemented; 0 human reviews recorded |
+| 4 | Timeouts, malformed output and unavailable provider handled visibly; routed to manual review | control C1, `anthropic_live.py`, `faults.py` | `test_provider_failures_route_to_manual_review_without_inventing`, `test_live_provider_malformed_and_refusal`; fault runs 80/80 | Implemented |
+| 4 | Prompt, rule and model versions stored; reassessment keeps history | `assessments` table | `test_reassessment_preserves_human_decision_and_history` | Implemented |
+| 5 | Explicit state machine with validated transitions | `workflow.TRANSITIONS` | `test_invalid_transitions_rejected` | Implemented |
+| 5 | Override requires a rationale; P0/P1 requires evidence reviewed | `workflow.decide_severity` | `test_override_requires_reason_and_code` | Implemented |
+| 5 | Simulated containment approval, review date, expiry and reversal | `workflow.propose/decide/end/expire_*` | `test_p0_containment_requires_incident_lead_via_direct_service_call`, `test_containment_expiry_and_reversal`, `test_account_lockout_needs_human_confirmed_p0` | Implemented (simulated) |
+| 5 | Closure fields and human sign-off | `workflow.ClosureRecord`, `close_incident` | `test_closure_requires_signoff_role_fields_and_state` | Implemented |
+| 5 | Reopen on new evidence | `workflow.add_evidence` | `test_new_evidence_reopens_closed_case` | Implemented |
+| 5 | Append-only events (not tamper-proof) | `db.py` triggers, `log_event` | `test_audit_events_are_append_only_and_persist`; screenshot 09 | Implemented |
+| 5 | Approval enforced in services, not just the UI | `workflow.require`, `PERMISSIONS` | `test_ai_actor_cannot_decide_severity_approve_or_close`, `test_p0_containment_requires_incident_lead_via_direct_service_call`; screenshot 05 (control disabled for Risk Ops; walkthrough asserts it) | Implemented |
+| 5 | Simulated identities labeled | `workflow.SIMULATED_ACTORS`, sidebar caption | UI | Implemented |
+| 5 | AI and policy updates never overwrite human decisions | `run_assessment`, `change_rule_version` | `test_reassessment_preserves_human_decision_and_history` | Implemented |
+| 6 | Executive brief, handoff, acknowledgment and closure summary; evidence references; specialist flags; never sent; edits versioned | `communications.py`, `workflow.save/review_communication` | `test_executive_brief_contains_required_sections`, `test_communication_edit_creates_version_and_resets_approval`; screenshot 07 | Implemented (templates); live drafting optional and untested against the API |
+| 7 | Queue volume and age, time to first review, time to containment, SLA breaches, overrides, categories (counts), failures, quality by version; seed vs demo | `monitoring.ops_metrics`, `app/page_dashboard.py` | screenshot 11 | Implemented |
+| 7 | Quality alert from a controlled change or injected fault, labeled | `monitoring.regression_check`, `rules_v1.1-fault-demo.json` | `test_regression_gate_flags_injected_rule_regression`; screenshot 10 | Implemented |
+| 8 | About 80 cases covering the listed scenario types, with labels and families | `scripts/generate_eval_dataset.py`, `data/eval/` | `test_dataset_size_splits_and_family_isolation`, `test_supporting_evidence_ids_exist` | 80 cases |
+| 8 | Family-based split; labels not accessible to the pipeline; held-out frozen | `splits.json`, `labels.jsonl`, `FREEZE.json` | `test_cases_contain_no_label_fields`, `test_held_out_matches_freeze` | Implemented; one pre-run disclosure |
+| 9 | Repeatable evaluation: baseline, AI-assisted (live) and revised version | `evaluation.py`, `cli.py`, `scripts/run_all_evals.sh` | `evaluation/results/*` | Baseline and revision run; **live pending** |
+| 9 | Required metrics with denominators and undefined handling | `evaluation.score` | `test_ratio_undefined_handling`, `test_rules_eval_runs_and_reports_denominators` | Implemented; claim support not reported (no reviews) |
+| 9 | At least three observed failure/correction examples; injected failures kept separate | `docs/evaluation.md` §5 and §4.2 | results artifacts | Six observed plus fault-injection table |
+| 10 | Tests for the listed operational risks | `tests/` | 55 passed, 1 strict xfail | Implemented |
+| 10 | App starts; browser interaction | `scripts/ui_smoke.py`, `scripts/ui_walkthrough.py` | All six pages and all case sections render without exceptions; seven-step walkthrough completed in headless Chromium | Verified locally |
+| 11 | Seeded cases and a five-minute walkthrough | `data/demo/`, `seed.py`, `docs/demo_walkthrough.md` | screenshots 01–12 | Implemented |
+| 12 | README, architecture, versioning, evaluation, walkthrough, case study, traceability, preserved framework | `README.md`, `docs/` | — | Implemented |

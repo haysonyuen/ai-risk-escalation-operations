@@ -1,0 +1,24 @@
+{
+  "incident_id": "DEMO-2001",
+  "reported_at": "2026-09-27T22:40:00+00:00",
+  "title": "Assistant may have shared our renewals file outside the company",
+  "product_surface": "enterprise_workspace",
+  "customer_type": "enterprise",
+  "reporter_channel": "enterprise_report",
+  "reported_behavior": "Enterprise admin says an employee asked the assistant to 'send the renewals summary to the account team'. The admin now sees a share link on the customer renewals spreadsheet and is not sure who can open it. They ask whether anyone outside the company saw it.",
+  "reported_impact": "Possible exposure of customer names and renewal pricing.",
+  "model_version": "assistant-2026.09-rc2",
+  "file_action": "read",
+  "external_action_attempted": "unknown",
+  "user_approved": "yes",
+  "sensitive_data": "possible",
+  "scope": "unknown",
+  "recurrence": "unknown",
+  "reversibility": "unknown",
+  "evidence": [
+    {"evidence_id": "E1", "source_type": "reporter_statement", "source_description": "Enterprise admin email", "content": "We found a share link on q3_customer_renewals.xlsx created during an assistant session. We don't know who can open it."},
+    {"evidence_id": "E2", "source_type": "tool_action_log", "source_description": "Share tool action log", "content": "create_share_link: doc=q3_customer_renewals.xlsx visibility=anyone_with_link initiated_by=assistant session=s-88412"},
+    {"evidence_id": "E3", "source_type": "approval_event", "source_description": "Approval event", "content": "User approved 'Share renewals summary with account team' - dialog did not show link visibility."},
+    {"evidence_id": "E4", "source_type": "telemetry", "source_description": "Link access telemetry", "content": "access log export pending; view count not yet available"}
+  ]
+}

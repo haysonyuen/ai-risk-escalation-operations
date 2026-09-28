@@ -1,0 +1,775 @@
+{
+  "run_id": "20260928T031817-rules_only_baseline-rules-rules-v1.0-dev-6e9a",
+  "created_at": "2026-09-28T03:18:17+00:00",
+  "label": "Baseline rules-v1.0 on dev",
+  "evaluation_kind": "rules_only_baseline",
+  "system": "rules",
+  "rule_version": "rules-v1.0",
+  "prompt_version": null,
+  "controls_version": "controls-v1.1",
+  "model_name": null,
+  "split": "dev",
+  "held_out_integrity": {
+    "matches_freeze": true,
+    "status": "untouched",
+    "frozen_at": "2026-09-28T02:37:27+00:00",
+    "disclosures": [
+      {
+        "date": "2026-09-28T02:43:26+00:00",
+        "previous_sha256": "dd083136af16d5514c61060ca71a57b4acdb5cfe8798a4b8a852767a28dbad08",
+        "change": "Rewrote 37 case titles (19 of them held-out) from analyst-summary wording to reporter-style wording because titles leaked the expected answer (e.g. 'embedded instruction', 'logs show no send'). Labels, evidence and all other fields unchanged.",
+        "trigger": "Noticed while debugging a rules-v1.0 DEVELOPMENT-set failure (EVAL-042 matched 'embedded instruction' in its title). No held-out evaluation had been run and rules-v1.1 did not yet exist."
+      }
+    ]
+  },
+  "labels_disclaimer": "Labels are provisional author-generated judgments on synthetic cases, not independently validated ground truth.",
+  "interpretation": "Deterministic rules; says nothing about model quality.",
+  "metrics": {
+    "n_cases": 44,
+    "recommendation_before_controls": {
+      "exact_match": {
+        "value": 0.6363636363636364,
+        "numerator": 28,
+        "denominator": 44
+      },
+      "within_acceptable_range": {
+        "value": 0.7954545454545454,
+        "numerator": 35,
+        "denominator": 44
+      },
+      "p0p1_precision": {
+        "value": 0.8235294117647058,
+        "numerator": 14,
+        "denominator": 17
+      },
+      "p0p1_recall": {
+        "value": 0.875,
+        "numerator": 14,
+        "denominator": 16
+      },
+      "p0p1_missed_where_all_acceptable_tiers_are_p0p1": 1,
+      "under_severity_outside_range": 1,
+      "over_severity_outside_range": 8,
+      "confusion_matrix_expected_rows_predicted_cols": {
+        "P0": {
+          "P0": 3,
+          "P1": 1,
+          "P2": 0,
+          "P3": 0,
+          "none": 0
+        },
+        "P1": {
+          "P0": 2,
+          "P1": 8,
+          "P2": 1,
+          "P3": 1,
+          "none": 0
+        },
+        "P2": {
+          "P0": 0,
+          "P1": 1,
+          "P2": 8,
+          "P3": 1,
+          "none": 0
+        },
+        "P3": {
+          "P0": 0,
+          "P1": 2,
+          "P2": 7,
+          "P3": 9,
+          "none": 0
+        }
+      },
+      "note": "Provider recommendation on schema-valid assessments only (denominator = valid assessments)."
+    },
+    "after_deterministic_controls": {
+      "exact_match": {
+        "value": 0.6363636363636364,
+        "numerator": 28,
+        "denominator": 44
+      },
+      "within_acceptable_range": {
+        "value": 0.7954545454545454,
+        "numerator": 35,
+        "denominator": 44
+      },
+      "p0p1_precision": {
+        "value": 0.8235294117647058,
+        "numerator": 14,
+        "denominator": 17
+      },
+      "p0p1_recall": {
+        "value": 0.875,
+        "numerator": 14,
+        "denominator": 16
+      },
+      "p0p1_missed_where_all_acceptable_tiers_are_p0p1": 1,
+      "under_severity_outside_range": 1,
+      "over_severity_outside_range": 8,
+      "confusion_matrix_expected_rows_predicted_cols": {
+        "P0": {
+          "P0": 3,
+          "P1": 1,
+          "P2": 0,
+          "P3": 0,
+          "none": 0
+        },
+        "P1": {
+          "P0": 2,
+          "P1": 8,
+          "P2": 1,
+          "P3": 1,
+          "none": 0
+        },
+        "P2": {
+          "P0": 0,
+          "P1": 1,
+          "P2": 8,
+          "P3": 1,
+          "none": 0
+        },
+        "P3": {
+          "P0": 0,
+          "P1": 2,
+          "P2": 7,
+          "P3": 9,
+          "none": 0
+        }
+      },
+      "note": "Recommendation after controls, all cases (failed assessments use the rules recommendation, labeled)."
+    },
+    "routing": {
+      "primary_route_exact": {
+        "value": 0.6363636363636364,
+        "numerator": 28,
+        "denominator": 44
+      },
+      "primary_route_acceptable": {
+        "value": 0.8181818181818182,
+        "numerator": 36,
+        "denominator": 44
+      }
+    },
+    "mandatory_review": {
+      "compliance_flagged_when_required": {
+        "value": 0.8181818181818182,
+        "numerator": 18,
+        "denominator": 22
+      },
+      "flagged_when_not_required": {
+        "value": 0.09090909090909091,
+        "numerator": 2,
+        "denominator": 22
+      }
+    },
+    "schema_valid_rate": {
+      "value": 1.0,
+      "numerator": 44,
+      "denominator": 44
+    },
+    "assessment_failures_routed_to_manual_review": {
+      "value": null,
+      "numerator": 0,
+      "denominator": 0,
+      "undefined_reason": "no failures"
+    },
+    "invalid_evidence_reference_rate_by_fact": {
+      "value": 0.0,
+      "numerator": 0,
+      "denominator": 74
+    },
+    "assessments_with_any_invalid_reference": {
+      "value": 0.0,
+      "numerator": 0,
+      "denominator": 44
+    },
+    "claim_support_accuracy": {
+      "value": null,
+      "undefined_reason": "No human claim-support reviews recorded for this run (see claim_review_worksheet.csv).",
+      "reviewed": 0
+    },
+    "latency_ms": {
+      "mean": 0.04157497725869193,
+      "p95": 0.07829100013623247,
+      "n": 44
+    },
+    "cost_usd_estimate": {
+      "total": null,
+      "n_with_cost": 0
+    },
+    "by_category": {
+      "ACT": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "APPROVAL": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "undefined_reason": "no case in category requires mandatory review"
+        }
+      },
+      "BENIGN": {
+        "n": 4,
+        "severity_within_range_after_controls": {
+          "value": 0.5,
+          "numerator": 2,
+          "denominator": 4
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.5,
+          "numerator": 2,
+          "denominator": 4
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "undefined_reason": "no case in category requires mandatory review"
+        }
+      },
+      "DUP": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 0.5,
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "FAIL": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "undefined_reason": "no case in category requires mandatory review"
+        }
+      },
+      "FILE": {
+        "n": 4,
+        "severity_within_range_after_controls": {
+          "value": 0.75,
+          "numerator": 3,
+          "denominator": 4
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.75,
+          "numerator": 3,
+          "denominator": 4
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "HARM": {
+        "n": 4,
+        "severity_within_range_after_controls": {
+          "value": 0.75,
+          "numerator": 3,
+          "denominator": 4
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "INACC": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "undefined_reason": "no case in category requires mandatory review"
+        }
+      },
+      "INCOMPLETE": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 0.3333333333333333,
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      "INJ": {
+        "n": 4,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "MANIP": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "PRIV": {
+        "n": 4,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        }
+      },
+      "SYNTH": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      }
+    }
+  },
+  "failures": [
+    {
+      "incident_id": "EVAL-002",
+      "family": "D-HARM-BIO",
+      "expected": "P3",
+      "acceptable": [
+        "P3",
+        "P2"
+      ],
+      "model_or_rules": "P1",
+      "after_controls": "P1",
+      "route": "safety",
+      "acceptable_routes": [
+        "safety",
+        "support"
+      ],
+      "review_required": false,
+      "review_flagged": true,
+      "triggered_rules": [
+        "SEV-P1-01",
+        "REV-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range"
+      ]
+    },
+    {
+      "incident_id": "EVAL-017",
+      "family": "D-FILE-EDIT",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "product_engineering",
+      "acceptable_routes": [
+        "support",
+        "product_ux"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range",
+        "route_not_acceptable"
+      ]
+    },
+    {
+      "incident_id": "EVAL-018",
+      "family": "D-FILE-EDIT",
+      "expected": "P1",
+      "acceptable": [
+        "P1",
+        "P2"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "product_engineering",
+      "acceptable_routes": [
+        "product_engineering",
+        "product_ux"
+      ],
+      "review_required": true,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "missed_mandatory_review"
+      ]
+    },
+    {
+      "incident_id": "EVAL-020",
+      "family": "D-APPROVAL",
+      "expected": "P2",
+      "acceptable": [
+        "P2"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "product_engineering",
+      "acceptable_routes": [
+        "product_ux"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "route_not_acceptable"
+      ]
+    },
+    {
+      "incident_id": "EVAL-021",
+      "family": "D-APPROVAL",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "product_ux",
+      "acceptable_routes": [
+        "support",
+        "product_ux"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range"
+      ]
+    },
+    {
+      "incident_id": "EVAL-024",
+      "family": "D-SYNTH-VOICE",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "safety",
+      "acceptable_routes": [
+        "support"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range",
+        "route_not_acceptable"
+      ]
+    },
+    {
+      "incident_id": "EVAL-030",
+      "family": "D-FAIL-SYNC",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "product_engineering",
+      "acceptable_routes": [
+        "support",
+        "product_engineering"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range"
+      ]
+    },
+    {
+      "incident_id": "EVAL-032",
+      "family": "D-BENIGN-HOWTO",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "product_engineering",
+      "acceptable_routes": [
+        "support"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range",
+        "route_not_acceptable"
+      ]
+    },
+    {
+      "incident_id": "EVAL-035",
+      "family": "D-BENIGN-HOWTO",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P1",
+      "after_controls": "P1",
+      "route": "safety",
+      "acceptable_routes": [
+        "support"
+      ],
+      "review_required": false,
+      "review_flagged": true,
+      "triggered_rules": [
+        "SEV-P1-01",
+        "REV-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range",
+        "route_not_acceptable"
+      ]
+    },
+    {
+      "incident_id": "EVAL-036",
+      "family": "D-INCOMPLETE",
+      "expected": "P1",
+      "acceptable": [
+        "P0",
+        "P1"
+      ],
+      "model_or_rules": "P3",
+      "after_controls": "P3",
+      "route": "support",
+      "acceptable_routes": [
+        "legal_privacy",
+        "risk_ops"
+      ],
+      "review_required": true,
+      "review_flagged": false,
+      "triggered_rules": [],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range",
+        "route_not_acceptable",
+        "missed_mandatory_review"
+      ]
+    },
+    {
+      "incident_id": "EVAL-037",
+      "family": "D-INCOMPLETE",
+      "expected": "P2",
+      "acceptable": [
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "model_or_rules": "P3",
+      "after_controls": "P3",
+      "route": "support",
+      "acceptable_routes": [
+        "risk_ops",
+        "support"
+      ],
+      "review_required": true,
+      "review_flagged": false,
+      "triggered_rules": [],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "missed_mandatory_review"
+      ]
+    },
+    {
+      "incident_id": "EVAL-041",
+      "family": "D-DUP-A",
+      "expected": "P2",
+      "acceptable": [
+        "P1",
+        "P2"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "product_engineering",
+      "acceptable_routes": [
+        "risk_ops",
+        "legal_privacy"
+      ],
+      "review_required": true,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "route_not_acceptable",
+        "missed_mandatory_review"
+      ]
+    },
+    {
+      "incident_id": "EVAL-044",
+      "family": "D-MANIP-A",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "product_engineering",
+      "acceptable_routes": [
+        "support"
+      ],
+      "review_required": true,
+      "review_flagged": true,
+      "triggered_rules": [
+        "SEV-P2-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range",
+        "route_not_acceptable"
+      ]
+    }
+  ]
+}
