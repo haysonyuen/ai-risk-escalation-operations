@@ -38,11 +38,19 @@
     "EVAL-079",
     "EVAL-080"
   ],
-  "sha256_cases_and_labels": "dd083136af16d5514c61060ca71a57b4acdb5cfe8798a4b8a852767a28dbad08",
+  "sha256_cases_and_labels": "d0276b5830232bfdc0cbe6d0f7d99712a38ee9f6052e92c5e3c2e4933234908d",
   "rule_versions_existing_at_freeze": [
     "rules-v1.0"
   ],
   "status": "untouched",
   "statement": "Held-out cases and labels were frozen before any rule tuning. rules-v1.0 was written before any evaluation. Development failures only may guide rule changes. If held-out results are ever used to change rules, set status to 'used-for-tuning' and disclose it; the set is then no longer untouched.",
-  "disclosures": []
+  "disclosures": [
+    {
+      "date": "2026-09-28T02:43:26+00:00",
+      "previous_sha256": "dd083136af16d5514c61060ca71a57b4acdb5cfe8798a4b8a852767a28dbad08",
+      "change": "Rewrote 37 case titles (19 of them held-out) from analyst-summary wording to reporter-style wording because titles leaked the expected answer (e.g. 'embedded instruction', 'logs show no send'). Labels, evidence and all other fields unchanged.",
+      "trigger": "Noticed while debugging a rules-v1.0 DEVELOPMENT-set failure (EVAL-042 matched 'embedded instruction' in its title). No held-out evaluation had been run and rules-v1.1 did not yet exist."
+    }
+  ],
+  "refrozen_at": "2026-09-28T02:43:26+00:00"
 }
