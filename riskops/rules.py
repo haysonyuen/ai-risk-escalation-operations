@@ -123,6 +123,8 @@ def compute_signals(incident: IncidentIntake, rules: dict) -> tuple[dict[str, bo
         "has_system_evidence": any(e.source_type in SYSTEM_EVIDENCE for e in i.evidence),
         "no_system_evidence": not any(e.source_type in SYSTEM_EVIDENCE for e in i.evidence),
         "no_evidence": len(i.evidence) == 0,
+        "telemetry_evidence": any(e.source_type == "telemetry" for e in i.evidence),
+        "impact_stated": i.reported_impact.strip().lower() not in ("", "unknown"),
         "safety_reviewer_report": i.reporter_channel == "safety_reviewer",
         "report_manipulation": bool(injection),
     })
@@ -157,14 +159,6 @@ def evaluate(incident: IncidentIntake, version: str) -> RuleResult:
             triggered.append({"id": r["id"], "kind": "severity", "description": r["description"]})
             break
 
-    floor_applied = None
-    for f in rules.get("severity_floors", []):
-        if matches(f, signals) and SEVERITY_ORDER[f["floor"]] < SEVERITY_ORDER[severity]:
-            floor_applied = {"id": f["id"], "from": severity, "to": f["floor"], "description": f["description"]}
-            triggered.append({"id": f["id"], "kind": "severity_floor", "description": f["description"]})
-            severity = f["floor"]
-            break
-
     impact = "low"
     for r in rules["impact_rules"]:
         if matches(r, signals):
@@ -187,12 +181,29 @@ def evaluate(incident: IncidentIntake, version: str) -> RuleResult:
     else:
         confidence = "medium"
 
+    # Floors run after impact/evidence are known, so they can encode
+    # "low confidence must not imply low severity". Floors only ever raise severity.
+    floor_signals = dict(signals, impact_high_or_critical=impact in ("high", "critical"),
+                         impact_critical=impact == "critical",
+                         evidence_weak_or_none=quality in ("weak", "none"), confidence_low=confidence == "low")
+    floor_applied = None
+    for f in rules.get("severity_floors", []):
+        if matches(f, floor_signals) and SEVERITY_ORDER[f["floor"]] < SEVERITY_ORDER[severity]:
+            floor_applied = {"id": f["id"], "from": severity, "to": f["floor"], "description": f["description"]}
+            triggered.append({"id": f["id"], "kind": "severity_floor", "description": f["description"]})
+            severity = f["floor"]
+            break
+
     categories = [c["category"] for c in rules["category_rules"] if matches(c, signals)] or ["benign_noise"]
     route = rules["default_route"]
     for cat, r in rules["route_priority"]:
         if cat in categories:
             route = r
             break
+    p3 = rules.get("p3_routing")
+    if p3 and severity == "P3" and not set(categories) & set(p3["keep_route_for_categories"]):
+        route = p3["route"]
+        triggered.append({"id": p3["id"], "kind": "routing", "description": p3["description"]})
     teams: list[str] = []
     for cat in categories:
         for t in rules["teams"].get(cat, []):
@@ -201,9 +212,8 @@ def evaluate(incident: IncidentIntake, version: str) -> RuleResult:
     if severity in ("P0", "P1") and "Incident Lead" not in teams:
         teams.insert(0, "Incident Lead")
 
-    sev_signals = dict(signals, **{f"sev_{s}": s == severity for s in SEVERITY_ORDER},
-                       confidence_low=confidence == "low",
-                       impact_high_or_critical=impact in ("high", "critical"))
+    sev_signals = dict(floor_signals, **{f"sev_{s}": s == severity for s in SEVERITY_ORDER},
+                       floor_applied=floor_applied is not None)
     reasons = []
     for r in rules["mandatory_review"]:
         if matches(r, sev_signals):

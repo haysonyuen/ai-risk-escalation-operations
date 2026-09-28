@@ -52,5 +52,16 @@
       "trigger": "Noticed while debugging a rules-v1.0 DEVELOPMENT-set failure (EVAL-042 matched 'embedded instruction' in its title). No held-out evaluation had been run and rules-v1.1 did not yet exist."
     }
   ],
-  "refrozen_at": "2026-09-28T02:43:26+00:00"
+  "refrozen_at": "2026-09-28T02:43:26+00:00",
+  "held_out_evaluations": [
+    {
+      "date": "2026-09-28",
+      "runs": [
+        "rules-v1.0 held_out",
+        "rules-v1.1 held_out"
+      ],
+      "used_for_tuning": false,
+      "note": "First held-out runs after rules-v1.1 was finalized on dev. rules-v1.1 regressed P0/P1 recall (EVAL-048). No rule changes were made from these results."
+    }
+  ]
 }
