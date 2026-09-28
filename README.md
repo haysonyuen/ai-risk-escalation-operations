@@ -8,6 +8,21 @@ It shows how Trust & Safety incident-response judgment can become working softwa
 
 ---
 
+## What it looks like
+
+All data is synthetic, and every AI output shown comes from a labeled offline fixture (not a model).
+
+| | |
+| --- | --- |
+| **Queue, most urgent first.** Each severity shows whether it is an unconfirmed AI recommendation or human-confirmed. The next action and the first-review deadline are shown per case. | **The AI's claims shown next to their evidence.** The AI said P2; the safety controls raised it to P1 and kept the Legal/Privacy route. A claim citing evidence that doesn't exist is marked in red. |
+| ![Incident queue](docs/screenshots/01_queue.png) | ![AI assessment with cited evidence](docs/screenshots/03_ai_assessment_facts.png) |
+| **People stay accountable.** A Risk Ops analyst cannot approve containment on a P0 case; the button is disabled and explains that the Incident Lead is needed. The service layer enforces the same rule. | **A regression gate on rule changes.** Switching to a revised rule version and re-running the frozen held-out evaluation raised an alert: P0/P1 recall fell from 92.9% to 85.7%. |
+| ![Containment needs Incident Lead](docs/screenshots/05_containment_needs_incident_lead.png) | ![Regression alert](docs/screenshots/10_regression_alert.png) |
+
+More screenshots, covering the full seven-step demo, are in [`docs/screenshots/`](docs/screenshots/) and [`docs/demo_walkthrough.md`](docs/demo_walkthrough.md).
+
+---
+
 ## Quick start
 
 Requires Python 3.10+.
