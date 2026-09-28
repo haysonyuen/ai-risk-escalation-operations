@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config
-from .assessment import assess_incident
+from .assessment import CONTROLS_VERSION, assess_incident
 from .providers import AnthropicProvider, FaultInjectionProvider, OfflineSimulationProvider
 from .schemas import SEVERITIES, IncidentIntake
 
@@ -215,6 +215,7 @@ def run_eval(system: str = "rules", rule_version: str = "rules-v1.0", prompt_ver
         "system": system,
         "rule_version": rule_version,
         "prompt_version": prompt_version if system == "live" else None,
+        "controls_version": CONTROLS_VERSION,
         "model_name": config.live_model_name() if system == "live" else None,
         "split": split,
         "held_out_integrity": held_out_integrity(),
@@ -279,7 +280,7 @@ def render_report(s: dict) -> str:
     lines = [
         f"# Evaluation run {s['run_id']}", "",
         f"* Kind: **{s['evaluation_kind']}** — {s['interpretation']}",
-        f"* Rule version: `{s['rule_version']}`; prompt: `{s['prompt_version']}`; model: `{s['model_name']}`",
+        f"* Rule version: `{s['rule_version']}`; controls: `{s.get('controls_version')}`; prompt: `{s['prompt_version']}`; model: `{s['model_name']}`",
         f"* Split: `{s['split']}`; cases: {m['n_cases']}",
         f"* Held-out integrity: matches freeze = {s['held_out_integrity']['matches_freeze']}, status = {s['held_out_integrity']['status']}",
         f"* {s['labels_disclaimer']}", "",

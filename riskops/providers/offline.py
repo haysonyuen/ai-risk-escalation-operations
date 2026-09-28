@@ -30,7 +30,7 @@ FIELD_LABELS = {
 
 
 def intake_fingerprint(incident: IncidentIntake) -> str:
-    payload = incident.model_dump(mode="json")
+    payload = incident.model_dump(mode="json", exclude={"reported_at"})
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -51,7 +51,6 @@ class OfflineSimulationProvider:
         if rr.signals.get("contradiction"):
             ids = [e.evidence_id for e in incident.evidence if e.source_type != "reporter_statement"]
             contradictions.append({"description": "Evidence text indicates records that do not match the report (lexicon match, needs human reading).", "evidence_ids": ids})
-        reasons = [r["reason"] for r in rr.review_reasons]
         candidate = {
             "summary": f"[SIMULATED] {incident.title}. Rules {rr.rule_version} matched {rr.severity_rule_id}; categories: {', '.join(rr.categories)}.",
             "reported_facts": facts,
@@ -69,7 +68,7 @@ class OfflineSimulationProvider:
             "suggested_teams": rr.teams,
             "next_steps": ["Human reviewer to read source evidence before confirming severity"]
                           + ([f"Retrieve missing information: {', '.join(FIELD_LABELS[f] for f in rr.unknown_fields)}"] if rr.unknown_fields else []),
-            "human_review_reasons": reasons,
+            "human_review_reasons": [],  # rules review reasons are already attached by the pipeline
             "containment_options": rr.containment_options,
             "incident_brief": f"[SIMULATED BRIEF] {incident.title}. Recommended {rr.severity} by rules; confidence {rr.confidence}. Evidence items: {len(incident.evidence)}.",
         }

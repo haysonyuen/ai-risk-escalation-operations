@@ -32,6 +32,10 @@ from .providers.base import AssessmentProvider
 from .schemas import SEVERITY_ORDER, AssessmentOutput, IncidentIntake, severity_max
 
 SPECIALIST_ROUTES = {"safety", "legal_privacy", "product_security"}
+# Version of the always-on controls (C1-C6) and the embedded-instruction detector.
+# controls-v1.0 -> v1.1: role labels inside conversation excerpts no longer count as
+# impersonation (false positive observed on seeded demo case INC-1001).
+CONTROLS_VERSION = "controls-v1.1"
 
 
 def _reason(code: str, text: str, source: str = "control") -> dict:
@@ -51,6 +55,7 @@ def assess_incident(incident: IncidentIntake, provider: AssessmentProvider, rule
         "model_name": pres.model_name,
         "prompt_version": prompt_version,
         "rule_version": rule_version,
+        "controls_version": CONTROLS_VERSION,
         "latency_ms": pres.latency_ms,
         "input_tokens": pres.input_tokens,
         "output_tokens": pres.output_tokens,

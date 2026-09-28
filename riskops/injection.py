@@ -12,6 +12,8 @@ import re
 
 from .schemas import IncidentIntake
 
+ROLE_LABEL = "impersonates a system/assistant role"
+
 # Patterns aimed at the triage system itself (as opposed to a report *describing* a prompt
 # injection against the product, which is a legitimate risk category handled by the rules).
 _PATTERNS: list[tuple[str, str]] = [
@@ -22,7 +24,7 @@ _PATTERNS: list[tuple[str, str]] = [
     (r"\b(close|resolve|dismiss) (this|the) (case|incident|ticket) (immediately|now|without)", "attempts to close the case"),
     (r"\bdo not (escalate|route|send) (this|to)", "attempts to suppress escalation"),
     (r"\b(route|escalate|forward) (this|the case|it) (directly )?to (legal|security|safety|the ceo|executives)\b.*\b(immediately|now)", "attempts to force routing"),
-    (r"^\s*(system|assistant|developer)\s*:", "impersonates a system/assistant role"),
+    (r"^\s*(system|assistant|developer)\s*:", ROLE_LABEL),
     (r"\[\s*(system|admin|override)\s*\]", "contains an override marker"),
     (r"\byou are (now )?(the|an?) (triage|review|evaluation) (model|system|assistant)", "addresses the triage system directly"),
     (r"\bnote to (the )?(ai|model|reviewer bot|triage (bot|system))", "addresses the triage system directly"),
@@ -30,9 +32,13 @@ _PATTERNS: list[tuple[str, str]] = [
 _COMPILED = [(re.compile(p, re.IGNORECASE | re.MULTILINE), why) for p, why in _PATTERNS]
 
 
-def scan_text(text: str) -> list[str]:
+def scan_text(text: str, transcript: bool = False) -> list[str]:
+    """``transcript=True`` for conversation excerpts, where role labels such as
+    "Assistant:" are expected formatting rather than impersonation (controls-v1.1 fix)."""
     reasons = []
     for rx, why in _COMPILED:
+        if transcript and why == ROLE_LABEL:
+            continue
         m = rx.search(text or "")
         if m:
             reasons.append(f"{why}: \"{m.group(0).strip()[:80]}\"")
@@ -51,6 +57,6 @@ def scan_incident(incident: IncidentIntake) -> list[dict]:
         for r in scan_text(text):
             findings.append({"location": name, "reason": r})
     for ev in incident.evidence:
-        for r in scan_text(ev.content):
+        for r in scan_text(ev.content, transcript=ev.source_type == "conversation_excerpt"):
             findings.append({"location": f"evidence:{ev.evidence_id}", "reason": r})
     return findings

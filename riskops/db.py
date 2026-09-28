@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -172,8 +173,27 @@ DEFAULT_SETTINGS = {
 }
 
 
+_CLOCK: datetime | None = None
+
+
+def utcnow() -> datetime:
+    """Current time, or the frozen time set by ``clock()`` (used only when seeding history)."""
+    return _CLOCK or datetime.now(timezone.utc)
+
+
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return utcnow().isoformat(timespec="seconds")
+
+
+@contextmanager
+def clock(dt: datetime):
+    """Temporarily freeze time so seeded historical records carry historical timestamps."""
+    global _CLOCK
+    prev, _CLOCK = _CLOCK, dt
+    try:
+        yield
+    finally:
+        _CLOCK = prev
 
 
 def connect(path: str | Path | None = None) -> sqlite3.Connection:

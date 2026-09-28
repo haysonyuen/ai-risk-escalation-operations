@@ -1,0 +1,708 @@
+{
+  "rule_version": "rules-v1.1-fault-demo",
+  "status": "FAULT INJECTION - demo only, never activate for real triage",
+  "created": "2026-09-28",
+  "description": "Deliberately broken copy of rules-v1.1 used to demonstrate the regression gate and quality alert. Removes the P0/P1 mandatory-review condition (REV-01), the low-confidence floor (FLOOR-01) and the harmful-topic P1 rule (SEV-P1-01). Any alert it triggers is SIMULATED DEGRADATION, not an observation about a model or production.",
+  "default_severity": "P3",
+  "default_route": "support",
+  "lexicons": {
+    "harmful_topic": [
+      "pathogen",
+      "viral culture",
+      "viral cultures",
+      "live culture",
+      "live cultures",
+      "select agent",
+      "toxin",
+      "nerve agent",
+      "weapon",
+      "explosive",
+      "credential-harvesting",
+      "credential harvesting",
+      "malware",
+      "ransomware",
+      "exploit kit",
+      "dangerous biological",
+      "biological material",
+      "hazardous chemical",
+      "restricted chemical"
+    ],
+    "assistant_provided": [
+      "provided steps",
+      "provided a",
+      "provided the",
+      "provided instructions",
+      "provided code",
+      "offered to",
+      "listed",
+      "gave steps",
+      "gave a list",
+      "gave instructions",
+      "generated",
+      "supplied",
+      "walked the user through",
+      "produced",
+      "drafted"
+    ],
+    "assistant_refused": [
+      "refused",
+      "declined",
+      "did not provide",
+      "would not",
+      "safety message",
+      "redirected"
+    ],
+    "external_exposure": [
+      "sent to an external",
+      "external recipient",
+      "emailed",
+      "shared publicly",
+      "public link",
+      "uploaded to",
+      "posted to",
+      "outside the organization",
+      "external domain"
+    ],
+    "cross_tenant": [
+      "another customer",
+      "another user's",
+      "other tenant",
+      "different organization's",
+      "someone else's"
+    ],
+    "injection_influence": [
+      "hidden instruction",
+      "hidden instructions",
+      "embedded instruction",
+      "embedded instructions",
+      "instructions hidden",
+      "text on the page instructed",
+      "the document contained instructions",
+      "injected",
+      "prompt injection",
+      "white text"
+    ],
+    "approval_fatigue": [
+      "approved without reading",
+      "approve without",
+      "too many approval",
+      "approval prompts",
+      "clicked approve",
+      "rubber-stamp",
+      "approval fatigue"
+    ],
+    "synthetic_media": [
+      "synthetic image",
+      "synthetic video",
+      "synthetic audio",
+      "voice clone",
+      "cloned voice",
+      "deepfake",
+      "face swap",
+      "likeness",
+      "fabricated photo"
+    ],
+    "real_person": [
+      "real person",
+      "public figure",
+      "coworker",
+      "colleague",
+      "named individual",
+      "politician",
+      "real individual",
+      "classmate"
+    ],
+    "inaccurate_output": [
+      "incorrect",
+      "inaccurate",
+      "fabricated citation",
+      "fabricated citations",
+      "made-up",
+      "made up",
+      "hallucinated",
+      "hallucination",
+      "wrong figures",
+      "wrong answer",
+      "nonexistent",
+      "false statement"
+    ],
+    "product_failure": [
+      "crash",
+      "crashes",
+      "crashed",
+      "timeout",
+      "timed out",
+      "failed to load",
+      "error message",
+      "broken",
+      "stopped working",
+      "outage",
+      "latency"
+    ],
+    "benign": [
+      "feature request",
+      "how do i",
+      "question about",
+      "working as designed",
+      "working as expected",
+      "test report",
+      "testing the form",
+      "no issue",
+      "suggestion",
+      "is it allowed",
+      "is allowed",
+      "question about likeness"
+    ],
+    "contradiction": [
+      "no record",
+      "does not show",
+      "do not show",
+      "logs show no",
+      "contradict",
+      "contradicts",
+      "inconsistent with",
+      "not present in the log",
+      "no matching"
+    ],
+    "containment_appeal": [
+      "safe mode",
+      "was restricted",
+      "access was restricted",
+      "appeal",
+      "reinstate",
+      "locked out",
+      "false positive"
+    ],
+    "exposure_claim": [
+      "sent our data",
+      "data somewhere",
+      "leaked",
+      "exposed our",
+      "shared our data",
+      "our data was sent",
+      "data breach"
+    ]
+  },
+  "corroboration_signals": [
+    "harmful_topic",
+    "external_exposure",
+    "cross_tenant",
+    "injection_influence",
+    "approval_fatigue",
+    "synthetic_media",
+    "inaccurate_output",
+    "product_failure",
+    "containment_appeal",
+    "exposure_claim"
+  ],
+  "severity_rules": [
+    {
+      "id": "SEV-P0-01",
+      "severity": "P0",
+      "description": "Harmful-topic report where the assistant provided or offered assistance and did not refuse.",
+      "all": [
+        "harmful_topic",
+        "assistant_provided"
+      ],
+      "none": [
+        "assistant_refused"
+      ]
+    },
+    {
+      "id": "SEV-P0-02",
+      "severity": "P0",
+      "description": "Sensitive data confirmed, external action attempted and external exposure language present.",
+      "all": [
+        "sensitive_yes",
+        "external_yes",
+        "external_exposure"
+      ]
+    },
+    {
+      "id": "SEV-P3-01",
+      "severity": "P3",
+      "description": "Harmful-topic report where the assistant refused and did not provide assistance: safeguard worked (route to Safety for sampling).",
+      "all": [
+        "harmful_topic",
+        "assistant_refused"
+      ],
+      "none": [
+        "assistant_provided"
+      ]
+    },
+    {
+      "id": "SEV-P1-02",
+      "severity": "P1",
+      "description": "Sensitive data possible or confirmed for an enterprise customer or with an external action.",
+      "all": [
+        "sensitive_any"
+      ],
+      "any": [
+        "enterprise",
+        "external_yes"
+      ]
+    },
+    {
+      "id": "SEV-P1-03",
+      "severity": "P1",
+      "description": "Untrusted-instruction influence together with an external action or file modification.",
+      "all": [
+        "injection_influence"
+      ],
+      "any": [
+        "external_yes",
+        "file_modified"
+      ]
+    },
+    {
+      "id": "SEV-P1-04",
+      "severity": "P1",
+      "description": "Action taken without user approval that was external or deleted a file.",
+      "all": [
+        "approved_no"
+      ],
+      "any": [
+        "external_yes",
+        "file_deleted"
+      ]
+    },
+    {
+      "id": "SEV-P1-05",
+      "severity": "P1",
+      "description": "Synthetic media depicting a real person.",
+      "all": [
+        "synthetic_media",
+        "real_person"
+      ]
+    },
+    {
+      "id": "SEV-P2-01",
+      "severity": "P2",
+      "description": "File modification with a material signal (stated impact, repeated, multi-user, irreversible or enterprise).",
+      "all": [
+        "file_modified"
+      ],
+      "any": [
+        "impact_stated",
+        "repeated",
+        "multi_scope",
+        "irreversible",
+        "enterprise"
+      ]
+    },
+    {
+      "id": "SEV-P2-02",
+      "severity": "P2",
+      "description": "Approval-friction pattern (repeated, multi-user or telemetry-backed) or approval failure with a destructive action.",
+      "all": [
+        "approval_fatigue"
+      ],
+      "any": [
+        "repeated",
+        "multi_scope",
+        "file_deleted",
+        "telemetry_evidence"
+      ]
+    },
+    {
+      "id": "SEV-P2-03",
+      "severity": "P2",
+      "description": "Recurring or multi-user product failure.",
+      "all": [
+        "product_failure"
+      ],
+      "any": [
+        "repeated",
+        "multi_scope"
+      ]
+    },
+    {
+      "id": "SEV-P2-04",
+      "severity": "P2",
+      "description": "Synthetic media report that is not a policy question.",
+      "all": [
+        "synthetic_media"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "id": "SEV-P2-05",
+      "severity": "P2",
+      "description": "Inaccurate output reported by an enterprise customer or recurring.",
+      "all": [
+        "inaccurate_output"
+      ],
+      "any": [
+        "enterprise",
+        "repeated"
+      ]
+    },
+    {
+      "id": "SEV-P2-06",
+      "severity": "P2",
+      "description": "Appeal of containment (possible false positive) needs expedited human review.",
+      "any": [
+        "containment_appeal"
+      ]
+    },
+    {
+      "id": "SEV-P2-07",
+      "severity": "P2",
+      "description": "Approved action deleted a file (approval/UX failure).",
+      "all": [
+        "file_deleted",
+        "approved_yes"
+      ]
+    }
+  ],
+  "severity_floors": [],
+  "impact_rules": [
+    {
+      "level": "critical",
+      "any": [
+        "harmful_topic"
+      ]
+    },
+    {
+      "level": "high",
+      "any": [
+        "exposure_claim"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "level": "high",
+      "all": [
+        "sensitive_any"
+      ],
+      "any": [
+        "external_yes",
+        "enterprise",
+        "cross_tenant"
+      ]
+    },
+    {
+      "level": "high",
+      "any": [
+        "injection_influence",
+        "cross_tenant"
+      ]
+    },
+    {
+      "level": "high",
+      "all": [
+        "approved_no"
+      ],
+      "any": [
+        "external_yes",
+        "file_deleted"
+      ]
+    },
+    {
+      "level": "moderate",
+      "any": [
+        "file_modified",
+        "repeated",
+        "multi_scope",
+        "synthetic_media",
+        "approval_fatigue",
+        "containment_appeal"
+      ]
+    }
+  ],
+  "category_rules": [
+    {
+      "category": "harmful_assistance",
+      "any": [
+        "harmful_topic"
+      ]
+    },
+    {
+      "category": "sensitive_data",
+      "any": [
+        "sensitive_any",
+        "cross_tenant",
+        "exposure_claim"
+      ]
+    },
+    {
+      "category": "prompt_injection",
+      "any": [
+        "injection_influence"
+      ]
+    },
+    {
+      "category": "unintended_action",
+      "all": [
+        "approved_no"
+      ],
+      "any": [
+        "external_yes",
+        "file_modified"
+      ]
+    },
+    {
+      "category": "file_modification",
+      "any": [
+        "file_modified"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "category": "approval_ux",
+      "any": [
+        "approval_fatigue"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "category": "synthetic_media",
+      "any": [
+        "synthetic_media"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "category": "inaccurate_output",
+      "any": [
+        "inaccurate_output"
+      ]
+    },
+    {
+      "category": "product_failure",
+      "any": [
+        "product_failure"
+      ]
+    },
+    {
+      "category": "containment_appeal",
+      "any": [
+        "containment_appeal"
+      ]
+    }
+  ],
+  "route_priority": [
+    [
+      "harmful_assistance",
+      "safety"
+    ],
+    [
+      "sensitive_data",
+      "legal_privacy"
+    ],
+    [
+      "prompt_injection",
+      "product_security"
+    ],
+    [
+      "synthetic_media",
+      "safety"
+    ],
+    [
+      "containment_appeal",
+      "risk_ops"
+    ],
+    [
+      "unintended_action",
+      "product_engineering"
+    ],
+    [
+      "approval_ux",
+      "product_ux"
+    ],
+    [
+      "file_modification",
+      "product_engineering"
+    ],
+    [
+      "product_failure",
+      "product_engineering"
+    ],
+    [
+      "inaccurate_output",
+      "product_engineering"
+    ],
+    [
+      "benign_noise",
+      "support"
+    ]
+  ],
+  "teams": {
+    "harmful_assistance": [
+      "Safety",
+      "Legal/Privacy",
+      "Risk Ops"
+    ],
+    "sensitive_data": [
+      "Legal/Privacy",
+      "Enterprise/CS",
+      "Risk Ops",
+      "Engineering"
+    ],
+    "prompt_injection": [
+      "Product Security",
+      "Engineering",
+      "Safety",
+      "Product/UX"
+    ],
+    "unintended_action": [
+      "Engineering",
+      "Product/UX",
+      "Support",
+      "Risk Ops"
+    ],
+    "file_modification": [
+      "Product/UX",
+      "Engineering",
+      "Support",
+      "Risk Ops"
+    ],
+    "approval_ux": [
+      "Product/UX",
+      "Support",
+      "Risk Ops"
+    ],
+    "synthetic_media": [
+      "Safety",
+      "Legal/Privacy",
+      "Support"
+    ],
+    "inaccurate_output": [
+      "Engineering",
+      "Product/UX",
+      "Support"
+    ],
+    "product_failure": [
+      "Engineering",
+      "Support"
+    ],
+    "containment_appeal": [
+      "Risk Ops",
+      "Support",
+      "Enterprise/CS"
+    ],
+    "benign_noise": [
+      "Support"
+    ]
+  },
+  "mandatory_review": [
+    {
+      "id": "REV-02",
+      "description": "Sensitive data possibly involved: Legal/Privacy-aware review required.",
+      "any": [
+        "sensitive_any"
+      ]
+    },
+    {
+      "id": "REV-03",
+      "description": "Enterprise file modification or external action: customer-impacting conclusions need human review.",
+      "all": [
+        "enterprise"
+      ],
+      "any": [
+        "file_modified",
+        "external_yes"
+      ]
+    },
+    {
+      "id": "REV-04",
+      "description": "Four or more key intake fields unknown: human triage needed before routing is relied on.",
+      "any": [
+        "many_unknowns"
+      ]
+    },
+    {
+      "id": "REV-05",
+      "description": "A severity floor was applied: confirm or correct with evidence.",
+      "any": [
+        "floor_applied"
+      ]
+    }
+  ],
+  "containment_options": {
+    "harmful_assistance": [
+      {
+        "action_type": "pause_interaction",
+        "target": "the reported conversation/session",
+        "rationale": "Stop continuation of potentially harmful assistance while Safety reviews.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      },
+      {
+        "action_type": "pause_external_transactions",
+        "target": "procurement/transaction tool actions for the affected account",
+        "rationale": "Prevent any external purchase or order flow while under review.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "sensitive_data": [
+      {
+        "action_type": "warn_sensitive_file_access",
+        "target": "affected workspace",
+        "rationale": "Add friction before sensitive file access while scope is assessed.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      },
+      {
+        "action_type": "restrict_tool_action",
+        "target": "external send/share tool for the affected workspace",
+        "rationale": "Prevent further external transmission pending investigation.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "prompt_injection": [
+      {
+        "action_type": "isolate_untrusted_instructions",
+        "target": "web/file content ingestion for the affected surface",
+        "rationale": "Treat instructions from untrusted content as data while Product Security investigates.",
+        "reversible": true,
+        "offer_at_or_above": "P2"
+      }
+    ],
+    "unintended_action": [
+      {
+        "action_type": "require_confirmation_destructive",
+        "target": "affected tool action",
+        "rationale": "Require explicit confirmation before the action type can run again.",
+        "reversible": true,
+        "offer_at_or_above": "P2"
+      }
+    ],
+    "file_modification": [
+      {
+        "action_type": "require_confirmation_destructive",
+        "target": "file edit/delete actions on the affected surface",
+        "rationale": "Add review friction for destructive edits.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ]
+  },
+  "parent_version": "rules-v1.1",
+  "changelog": [
+    "FAULT: removed REV-01, FLOOR-01, SEV-P1-01 to simulate an unsafe rule edit."
+  ],
+  "p3_routing": {
+    "id": "ROUTE-P3",
+    "route": "support",
+    "description": "P3 without a specialist category routes to Support (support education, trend monitoring, QA sampling).",
+    "keep_route_for_categories": [
+      "harmful_assistance",
+      "sensitive_data",
+      "prompt_injection",
+      "synthetic_media"
+    ]
+  }
+}
