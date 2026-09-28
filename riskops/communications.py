@@ -10,7 +10,19 @@ import json
 
 from . import config
 from .db import rows
-from .workflow import effective_severity, get_assessment, get_incident, get_intake, latest_communications
+from .workflow import (SIMULATED_ACTORS, effective_severity, get_assessment, get_incident, get_intake,
+                       latest_communications)
+
+STATUS_TEXT = {"NEW": "New", "ASSESSED": "Awaiting triage", "ASSESSMENT_FAILED": "Awaiting triage (AI assessment failed)",
+               "TRIAGED": "Triaged", "INVESTIGATING": "Investigating", "CONTAINMENT": "Containment", "RESPONSE": "Response",
+               "CLOSED": "Closed", "REOPENED": "Reopened", "QA_REVIEWED": "Closed (QA reviewed)"}
+
+
+def _person(actor_id: str | None) -> str:
+    for a in SIMULATED_ACTORS:
+        if a.actor_id == actor_id:
+            return a.display.replace(" (simulated)", "")
+    return actor_id or "unassigned"
 
 COMM_TYPES = {
     "executive_brief": "Executive incident brief",
@@ -91,10 +103,10 @@ def render(conn, incident_id: str, comm_type: str) -> tuple[str, list[str], list
     sev_line = f"{ctx['sev']} ({'human-confirmed' if ctx['basis'] == 'human' else 'NOT YET CONFIRMED by a human: ' + ctx['basis']})"
     if comm_type == "executive_brief":
         body = [HEADER, f"EXECUTIVE BRIEF — {i.incident_id}: {i.title}", "",
-                f"Severity: {sev_line}", f"Status: {inc['status']}  |  Owner: {inc['owner'] or 'unassigned'}",
+                f"Severity: {sev_line}", f"Status: {STATUS_TEXT.get(inc['status'], inc['status'])}  |  Owner: {_person(inc['owner'])}",
                 f"Teams: {', '.join(teams) or 'not set'}", "",
                 "Impact (as reported / assessed):", f"- {i.reported_impact if i.reported_impact != 'unknown' else 'Impact not yet established.'}",
-                f"- Scope: {i.scope}; customer type: {i.customer_type}; sensitive data: {i.sensitive_data}", "",
+                f"- Scope: {i.scope.replace('_', ' ')}; customer type: {i.customer_type}; sensitive data: {i.sensitive_data}", "",
                 "Facts from evidence:", *_fact_lines(ctx), "", "Uncertainty:", *_uncertainty(ctx), "",
                 "Actions:", *_actions(ctx), "",
                 "Next decision / update needed:",

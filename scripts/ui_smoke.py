@@ -11,7 +11,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-PAGES = ["Incident queue", "Incident workspace", "New intake", "Quality & evaluation", "Rules & playbooks", "Monitoring"]
+PAGES = ["Queue", "Case", "New report", "Dashboard", "Quality & evaluation", "Rules & playbooks"]
 URL = "http://localhost:8501"
 
 
@@ -36,10 +36,10 @@ def main(out: Path) -> int:
         b = p.chromium.launch(executable_path=exe) if Path(exe).exists() else p.chromium.launch()
         page = b.new_page(viewport={"width": 1500, "height": 1000})
         page.goto(URL)
-        page.wait_for_selector("text=AI Risk & Escalation Ops", timeout=30000)
+        page.wait_for_selector("text=Incident queue", timeout=30000)
         wait_idle(page)
         for name in PAGES:
-            page.get_by_text(name, exact=True).first.click()
+            page.locator('[data-testid="stSidebarNav"]').get_by_text(name, exact=True).first.click()
             wait_idle(page)
             ex = exceptions(page)
             problems += len(ex)
@@ -48,9 +48,9 @@ def main(out: Path) -> int:
                 print("   ", e.replace("\n", " | ")[:400])
             page.screenshot(path=str(out / f"{name.replace(' ', '_').replace('&', 'and')}.png"), full_page=True)
         # every workspace tab
-        page.get_by_text("Incident workspace", exact=True).first.click()
+        page.locator('[data-testid="stSidebarNav"]').get_by_text("Case", exact=True).first.click()
         wait_idle(page)
-        labels = [t.inner_text() for t in page.query_selector_all('[data-testid="stButtonGroup"] button')]
+        labels = ["Overview", "Evidence", "Activity", "Related", "AI details"]
         for label in labels:
             tab = page.locator('[data-testid="stButtonGroup"]').get_by_text(label, exact=True).first
             tab.click()

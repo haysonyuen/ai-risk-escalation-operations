@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import config
 from .db import rows
-from .workflow import effective_severity, get_assessment, latest_communications
+from .workflow import effective_severity, get_assessment, latest_communications, next_actions
 
 OPEN = {"NEW", "ASSESSED", "ASSESSMENT_FAILED", "TRIAGED", "INVESTIGATING", "CONTAINMENT", "RESPONSE", "REOPENED"}
 
@@ -71,8 +71,16 @@ def queue(conn, now: datetime | None = None) -> list[dict]:
             "review_deadline": deadline.isoformat(timespec="minutes") if deadline else None,
             "overdue": overdue, "first_review_breached": breached,
             "pending": pending, "origin": inc["origin"],
+            "next_actions": next_actions(conn, inc["incident_id"]),
+            "minutes_to_deadline": round((deadline - now).total_seconds() / 60) if deadline and not reviewed else None,
+            "urgency": (0 if overdue else 1, {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[sev],
+                        (deadline - now).total_seconds() if deadline and not reviewed else 1e12),
         })
     return out
+
+
+def case_row(conn, incident_id: str, now: datetime | None = None) -> dict:
+    return next(x for x in queue(conn, now) if x["incident_id"] == incident_id)
 
 
 def _minutes(a: datetime | None, b: datetime | None) -> float | None:

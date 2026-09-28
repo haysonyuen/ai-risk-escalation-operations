@@ -21,6 +21,17 @@ streamlit run app/streamlit_app.py         # http://localhost:8501
 
 Everything runs offline. For the optional live model mode, copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` (and optionally `RISKOPS_LIVE_MODEL`). If the key is missing, live mode **fails visibly**: cases go to manual review, and live evaluation refuses to run. It never falls back to offline results silently.
 
+### Using the interface
+
+* **Queue** (home page): the cases that need action, most urgent first. Click a row to open it. The **Filters** popover narrows by severity, category, owner or review flag.
+* **Case**: the whole case on one screen.
+  * The **Next** panel says what the case needs and whether your role can do it.
+  * The left side is the case file: the report, the AI assessment with each claim shown beside the evidence it cites, evidence, activity, related reports and AI details.
+  * The right side holds the actions: the severity and routing decision, owner and stage, containment, draft communications, and closure. Controls your role can't use are disabled, with the reason shown.
+* **New report**: a structured form, or JSON import.
+* **Dashboard**, **Quality & evaluation**, **Rules & playbooks**: oversight, metrics and rule governance.
+* **Working as** (sidebar): switch between simulated roles to see the approval rules in action. This is not a login.
+
 | Task | Command |
 | --- | --- |
 | Reset and seed the demo database | `python -m riskops.cli seed` (or **Reset demo data** in the sidebar) |
@@ -106,6 +117,7 @@ Full method, results, observed failures and limitations: [`docs/evaluation.md`](
 | [docs/evaluation.md](docs/evaluation.md) | Evaluation methodology, results, observed failures, fault injection, limitations |
 | [docs/demo_walkthrough.md](docs/demo_walkthrough.md) | Five-minute demo script with screenshots |
 | [docs/case_study.md](docs/case_study.md) | Decisions and tradeoffs |
+| [docs/ux_review.md](docs/ux_review.md) | Interface review: problems found and the operator-focused redesign |
 | [docs/requirements_traceability.md](docs/requirements_traceability.md) | Requirement → code / test / result table |
 | [docs/timed_review_protocol.md](docs/timed_review_protocol.md) | Optional procedure for a future timed-review user study |
 
@@ -124,7 +136,8 @@ riskops/            business logic (no UI code)
   monitoring.py     queue, ops metrics, regression gate
   evaluation.py     evaluation harness and metrics
   db.py, seed.py, cli.py
-app/                Streamlit UI (views call riskops services only)
+app/                Streamlit UI: page_queue, page_case, page_intake, page_dashboard, view_quality, view_rules
+                    (pages call riskops services only)
 playbooks/          rules_v1.0.json, rules_v1.1.json, rules_v1.1-fault-demo.json
 config/sla.json     prototype SLA assumptions
 data/eval/          cases.jsonl, labels.jsonl, splits.json, FREEZE.json
@@ -137,6 +150,6 @@ docs/               documentation and screenshots
 
 ## Project status
 
-* **Implemented and tested locally:** the full workflow, UI, rules v1.0/v1.1, controls, offline providers, the fault-injection harness, the evaluation harness, and the seed/reset command. There are 53 automated tests passing, plus 1 strict expected-failure that documents a known rules-v1.1 limitation. A browser smoke test covered every view, and the seven-step demo was driven end to end through the UI in headless Chromium.
+* **Implemented and tested locally:** the full workflow, UI, rules v1.0/v1.1, controls, offline providers, the fault-injection harness, the evaluation harness, and the seed/reset command. There are 55 automated tests passing, plus 1 strict expected-failure that documents a known rules-v1.1 limitation. A browser smoke test covered every page, and the seven-step demo was driven end to end through the redesigned UI in headless Chromium.
 * **Simulated:** containment, communications, identities and roles, historical timestamps (seeded), and offline AI outputs.
 * **Unvalidated:** labels (single author), live-model quality (not run), claim-support accuracy (no reviews), and any time-savings claim (no study; see the protocol).

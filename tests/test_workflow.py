@@ -261,3 +261,33 @@ def test_future_reported_at_is_rejected(conn, actors):
     future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
     with pytest.raises(wf.WorkflowError, match="future"):
         wf.create_incident(conn, make_intake(reported_at=future), actors["casey.support"])
+
+
+def test_next_actions_guide_by_status_and_role(conn, actors):
+    iid = _p0_case(conn, actors)
+    acts = wf.next_actions(conn, iid)
+    assert acts[0]["title"] == "Decide severity and routing" and acts[0]["urgent"]
+    assert wf.actor_can_do(conn, actors["alex.riskops"], acts[0])
+    assert not wf.actor_can_do(conn, actors["casey.support"], acts[0])
+    ca = wf.propose_containment(conn, iid, SYS, "pause_interaction", "session", "stop", source="ai")
+    cont = [x for x in wf.next_actions(conn, iid) if x["title"] == "Decide on proposed containment"][0]
+    assert wf.who_can_do(cont) == "Incident Lead"  # P0 by AI recommendation
+    assert not wf.actor_can_do(conn, actors["alex.riskops"], cont)
+    wf.decide_containment(conn, ca, actors["sam.lead"], True, "approve for now")
+    wf.decide_severity(conn, iid, actors["sam.lead"], "P0", "safety", ["Safety"], reason="ok", evidence_reviewed=["E1"])
+    wf.transition(conn, iid, "RESPONSE", actors["sam.lead"])
+    close = [x for x in wf.next_actions(conn, iid) if x["title"].startswith("Close")][0]
+    assert close["permission"] == "close_p0p1"
+    assert wf.closure_blockers(conn, iid) == []  # active containment is acknowledged in the dialog, not a blocker
+
+
+def test_closure_blockers_match_close_incident_checks(conn, actors):
+    iid = _p0_case(conn, actors)
+    wf.decide_severity(conn, iid, actors["sam.lead"], "P0", "safety", ["Safety"], reason="ok", evidence_reviewed=["E1"])
+    wf.transition(conn, iid, "RESPONSE", actors["sam.lead"])
+    wf.propose_containment(conn, iid, SYS, "pause_interaction", "session", "stop", source="ai")
+    communications.generate(conn, iid, "user_ack", actors["casey.support"])
+    blockers = wf.closure_blockers(conn, iid)
+    assert any("containment" in b for b in blockers) and any("awaits" in b for b in blockers)
+    with pytest.raises(wf.WorkflowError):
+        wf.close_incident(conn, iid, _closure("P0"), actors["sam.lead"])

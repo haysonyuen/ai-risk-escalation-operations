@@ -10,7 +10,8 @@
 
 ```text
              ┌───────────────────────── app/ (Streamlit) ─────────────────────────┐
-             │ queue · workspace · intake · quality · rules · monitoring           │
+             │ Operations: queue · case · new report  |  Oversight: dashboard ·     │
+             │ quality · rules — case page driven by workflow.next_actions()       │
              │ simulated identity selector (NOT authentication)                    │
              └───────────────┬──────────────────────────────────────────────────────┘
                              │ service calls only

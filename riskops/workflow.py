@@ -773,3 +773,107 @@ def record_eval_run(conn, summary: dict, origin: str = "demo") -> None:
                   json.dumps({k: summary[k] for k in ("evaluation_kind", "system", "rule_version", "prompt_version", "split", "model_name")}),
                   json.dumps(summary), summary.get("artifact_dir"), origin))
     conn.commit()
+
+
+# ---------------------------------------------------------------------------------------
+# Guidance for the UI: who may do what, and what a case needs next.
+# These read-only helpers mirror the checks above so the interface can disable controls
+# with a reason; the mutating functions still enforce every rule themselves.
+# ---------------------------------------------------------------------------------------
+
+
+def can(actor: Actor, permission: str) -> bool:
+    return actor.role in PERMISSIONS[permission]
+
+
+def roles_for(permission: str) -> str:
+    return " or ".join(ROLE_LABELS[r] for r in sorted(PERMISSIONS[permission]) if r != "system")
+
+
+def containment_permission(conn, inc: dict) -> str:
+    sev, _ = effective_severity(conn, inc)
+    return "approve_containment_p0p1" if sev in ("P0", "P1") else "approve_containment_p2p3"
+
+
+def closure_permission(inc: dict) -> str:
+    return "close_p0p1" if inc["human_severity"] in ("P0", "P1") else "close_p2p3"
+
+
+def closure_blockers(conn, incident_id: str) -> list[str]:
+    """Reasons closure would be refused right now (same checks as close_incident)."""
+    inc = get_incident(conn, incident_id)
+    out = []
+    if not inc["human_severity"]:
+        out.append("No human severity decision recorded")
+    if inc["status"] != "RESPONSE":
+        out.append(f"Case must be in the Response stage (currently {inc['status']})")
+    n = len(rows(conn, "SELECT 1 FROM containment_actions WHERE incident_id=? AND status='proposed'", (incident_id,)))
+    if n:
+        out.append(f"{n} containment proposal(s) awaiting a decision")
+    for c in latest_communications(conn, incident_id):
+        spec = json.loads(c["specialist_review_json"])
+        if spec["required"] and c["status"] == "draft":
+            missing = [s for s in spec["required"] if s not in spec["approvals"]]
+            out.append(f"Draft '{c['comm_type']}' awaits {', '.join(missing)} review")
+    return out
+
+
+def next_actions(conn, incident_id: str) -> list[dict]:
+    """Ordered list of what this case needs next: {title, detail, permission, urgent}.
+    ``permission`` is a key of PERMISSIONS (or a specialist role marker)."""
+    inc = get_incident(conn, incident_id)
+    a = get_assessment(conn, inc["current_assessment_id"])
+    st = inc["status"]
+    out: list[dict] = []
+
+    def add(title, detail, permission, urgent=False, role=None):
+        out.append({"title": title, "detail": detail, "permission": permission, "role": role, "urgent": urgent})
+
+    if st == "NEW":
+        add("Run the AI assessment", "Or record a severity decision manually.", "run_assessment")
+    if st in ("NEW", "ASSESSED", "ASSESSMENT_FAILED", "REOPENED"):
+        detail = "Review the source evidence, then confirm or correct the AI recommendation."
+        if a and a["status"] == "failed":
+            detail = "The AI assessment failed. Triage manually from the evidence."
+        elif st == "REOPENED":
+            detail = "New evidence reopened this case. Re-triage it."
+        add("Decide severity and routing", detail, "decide_severity", urgent=True)
+    for p in rows(conn, "SELECT * FROM containment_actions WHERE incident_id=? AND status='proposed'", (incident_id,)):
+        add("Decide on proposed containment", f"{p['action_type'].replace('_', ' ')} on {p['target']}",
+            containment_permission(conn, inc), urgent=True)
+    now = utcnow().isoformat(timespec="seconds")
+    for p in rows(conn, "SELECT * FROM containment_actions WHERE incident_id=? AND status='active' AND review_by<=?", (incident_id, now)):
+        add("Review temporary containment", f"{p['action_type'].replace('_', ' ')} passed its review time", "end_containment", urgent=True)
+    for c in latest_communications(conn, incident_id):
+        spec = json.loads(c["specialist_review_json"])
+        if c["status"] == "draft":
+            missing = [s for s in spec["required"] if s not in spec["approvals"]]
+            for s in missing:
+                add(f"{s} review of a draft", c["comm_type"].replace("_", " "), None, role=SPECIALIST_REVIEW_ROLE[s])
+    if rows(conn, "SELECT 1 FROM links WHERE (incident_a=? OR incident_b=?) AND status='suggested'", (incident_id, incident_id)):
+        add("Confirm or reject related reports", "Suggested matches are waiting for a reviewer.", "decide_link")
+    if st == "TRIAGED":
+        add("Start investigation", "Or move straight to response for low-risk cases.", "transition")
+    elif st == "INVESTIGATING":
+        add("Contain or move to response", "Propose containment if there is credible ongoing risk.", "transition")
+    elif st == "CONTAINMENT":
+        add("Move to response", "Once containment is in place.", "transition")
+    elif st == "RESPONSE":
+        blockers = closure_blockers(conn, incident_id)
+        add("Close the case with sign-off", "Blocked: " + "; ".join(blockers) if blockers else "Ready to close.",
+            closure_permission(inc))
+    elif st == "CLOSED":
+        add("Quality review (sampling)", "Optional: check the handling for missed escalation.", "qa_review")
+    return out
+
+
+def actor_can_do(conn, actor: Actor, action: dict) -> bool:
+    if action["role"]:
+        return actor.role == action["role"]
+    return can(actor, action["permission"])
+
+
+def who_can_do(action: dict) -> str:
+    if action["role"]:
+        return ROLE_LABELS[action["role"]]
+    return roles_for(action["permission"])
