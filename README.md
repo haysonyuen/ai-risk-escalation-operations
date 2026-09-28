@@ -1,126 +1,142 @@
 # AI Risk & Escalation Operations
 
-A conceptual operating framework exploring how an operations team could triage and respond to safety, privacy, security, and product-risk reports involving an AI assistant.
+A locally runnable **prototype** of an AI-assisted incident triage and escalation workflow for early harm signals from an AI work assistant. It implements the conceptual operating framework in [`docs/framework.md`](docs/framework.md): an eight-stage process, P0–P3 severity, proportional containment, and clear human accountability.
 
-This case study focuses on the operating system around a high-stakes incident: how signals enter the queue, how severity is assigned, who owns each decision, when containment should begin, and how the organization learns after closure. AI can accelerate analysis, but people remain accountable for consequential decisions.
+It shows how Trust & Safety incident-response judgment can become working software: evidence-linked AI assessments, explicit deterministic controls, human decisions and overrides with recorded reasons, governed rule versions, and a repeatable evaluation harness with a frozen held-out set.
 
-## At a glance
+> **What this is not.** This is a portfolio prototype that uses **synthetic incidents**. Containment and communications are **simulated**; nothing is sent or enforced. Roles are **simulated identities**, not authentication. No real organisation uses it, and it makes no claims about production reliability, harm reduction or business impact. Offline "AI" outputs are hand-written fixtures or a deterministic simulation, **not measured model performance**. No live-model evaluation has been run yet (details below).
 
-- **Severity model:** Four tiers that connect credible harm and urgency to specific response expectations.
-- **Human-in-the-loop triage:** AI may enrich, cluster, and summarize reports; trained reviewers assign severity and verify evidence.
-- **Cross-functional ownership:** Risk Operations coordinates with Safety, Support, Engineering, Product Security, Product, Legal/Privacy, Analytics, and customer-facing teams.
-- **Proportional containment:** Mitigations are targeted to the risky capability and calibrated to confidence, scope, and reversibility.
-- **Closed-loop learning:** Quality reviews, trend analysis, and post-incident findings feed product controls, playbooks, and analyst calibration.
+---
 
-## Operating principles
+## Quick start
 
-1. **Contain credible harm early.** Do not wait for perfect certainty when a narrowly scoped, reversible safeguard can reduce ongoing risk.
-2. **Preserve evidence and access it responsibly.** Maintain the records needed for investigation while limiting sensitive material to approved, need-to-know environments.
-3. **Separate assistance from accountability.** Automated systems can organize evidence and surface patterns; people own severity, policy, privacy, customer-impacting, and closure decisions.
-4. **Match the response to the risk.** Prefer focused controls over broad restrictions, especially when confidence is limited or false positives could disrupt legitimate users.
-5. **Design for recovery.** Every response path should consider reversibility, user support, appeals, and correction of mistaken containment.
+Requires Python 3.10+.
 
-## Severity framework
-
-| Tier | Decision standard | Response posture |
-| --- | --- | --- |
-| **P0 - Critical** | Credible immediate danger, active harmful facilitation, or highly credible severe exposure | Immediate targeted containment, evidence preservation, and same-hour human review |
-| **P1 - High** | Serious safety, privacy, security, or loss-of-control concern without confirmed broad active harm | Same-day investigation, specialist escalation, and a communication plan |
-| **P2 - Medium** | Material user impact or a recurring product or workflow failure | Pattern investigation, user guidance, and routing to the responsible product or technical team |
-| **P3 - Low** | Confusion, duplication, expected launch noise, or a report with no current evidence of harm | Support, trend monitoring, and quality sampling |
-
-Severity is not a substitute for judgment. Reviewers should consider evidence quality, potential impact, scope, reversibility, user understanding, and whether the risk is isolated or systemic.
-
-## End-to-end workflow
-
-```text
-Intake
-  -> AI-assisted enrichment and deduplication
-  -> Human severity triage
-  -> Investigation and scope assessment
-  -> Escalation and proportional containment
-  -> User or customer response
-  -> Resolution and human-approved closure
-  -> Feedback loop and quality assurance
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python -m riskops.cli seed                 # create data/riskops.db with 12 synthetic incidents
+streamlit run app/streamlit_app.py         # http://localhost:8501
 ```
 
-### 1. Intake
+Everything runs offline. For the optional live model mode, copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` (and optionally `RISKOPS_LIVE_MODEL`). If the key is missing, live mode **fails visibly**: cases go to manual review, and live evaluation refuses to run. It never falls back to offline results silently.
 
-Route reports into a single queue with consistent fields for the affected product surface, reported impact, timestamps, relevant versions, user-visible actions, potential sensitive-data involvement, and available evidence. The goal is to make urgent cases legible without forcing the reporter to diagnose the root cause.
-
-### 2. AI-assisted enrichment and deduplication
-
-Use approved internal tooling to extract structured fields, build a concise timeline, identify related reports, and flag possible high-risk patterns. Every summary should point back to source evidence, and reviewers should verify material facts before escalation, closure, or external communication.
-
-### 3. Human severity triage
-
-Risk Operations evaluates context rather than simply accepting an automated label. Reviewers correct false positives, identify missed high-severity cases, and decide whether the observed behavior, user understanding, and potential impact justify escalation.
-
-### 4. Investigation and scope assessment
-
-Establish what occurred, what evidence supports it, whether the outcome was reversible, and how widely the issue may extend. Avoid assigning root cause until model behavior, product design, permissions, security factors, and user experience have been considered.
-
-### 5. Escalation and proportional containment
-
-Bring in the functions needed for the risk class and apply the narrowest effective safeguard. Temporary controls should be reviewed promptly; broad or permanent actions require stronger evidence and human approval.
-
-### 6. User or customer response
-
-Acknowledge the report, explain the investigation path, and offer practical recovery steps without speculating or blaming the reporter. Sensitive legal, privacy, contractual, or regulatory statements receive appropriate specialist review.
-
-### 7. Resolution and closure
-
-Record final severity, root cause, impact, evidence reviewed, teams involved, mitigations, response status, and remaining follow-up. High-severity incidents require explicit human sign-off.
-
-### 8. Feedback loop and quality assurance
-
-Review recurring themes, missed escalations, false positives, response quality, and evidence gaps. Convert findings into product improvements, control updates, playbook revisions, training examples, and future QA samples.
-
-## Ownership model
-
-| Function | Primary responsibility |
+| Task | Command |
 | --- | --- |
-| **Risk Operations / Incident Lead** | Triage, investigation coordination, high-severity response, and closure |
-| **Support / Customer teams** | Intake, reporter communication, recovery guidance, and customer delivery |
-| **Safety** | Harm assessment and ambiguous policy interpretation |
-| **Engineering / Product Security** | Logs, debugging, technical containment, access controls, and security analysis |
-| **Product / Design** | User controls, product mitigations, and trust improvements |
-| **Legal / Privacy** | Legal obligations, sensitive-data assessment, and reviewed communications |
-| **Data / Analytics** | Dashboards, recurrence analysis, and service-level reporting |
+| Reset and seed the demo database | `python -m riskops.cli seed` (or **Reset demo data** in the sidebar) |
+| Run the tests | `python -m pytest -q` |
+| Reproduce every evaluation artifact | `./scripts/run_all_evals.sh` |
+| Run one evaluation | `python -m riskops.cli eval --system rules --rules rules-v1.1 --split held_out` |
+| Compare runs | `python -m riskops.cli compare evaluation/results/<run> evaluation/results/<run>` |
+| Live-model evaluation (pending, needs a key) | `python -m riskops.cli eval --system live --rules rules-v1.1 --prompt prompt-v2 --split dev` |
+| Regenerate the dataset / fixtures | `python scripts/generate_eval_dataset.py` · `PYTHONPATH=. python scripts/build_fixtures.py` |
+| Browser smoke test / scripted demo (app running) | `python scripts/ui_smoke.py` · `python scripts/ui_walkthrough.py docs/screenshots` |
 
-## Human accountability boundaries
+The five-minute demo script is in [`docs/demo_walkthrough.md`](docs/demo_walkthrough.md).
 
-People remain responsible for:
+---
 
-- P0/P1 severity decisions and final closure
-- safety-policy and legal/privacy interpretation
-- consequential customer or account actions
-- product rollback or capability restrictions
-- review of temporary containment
-- attribution of responsibility and external conclusions
+## What is implemented
 
-Automation should not turn a plausible summary into an assumed fact. High-severity cases require review of source evidence, and lower-severity closures should be sampled to detect under-escalation.
+**The eight-stage workflow** is an explicit state machine (`riskops/workflow.py`). Every transition is validated, and every state change is written as an append-only event:
 
-## Measures of effectiveness
+`NEW` (1 Intake) → `ASSESSED` / `ASSESSMENT_FAILED` (2 AI enrichment) → `TRIAGED` (3 Human severity triage) → `INVESTIGATING` (4) → `CONTAINMENT` (5) → `RESPONSE` (6) → `CLOSED` (7, human sign-off) → `QA_REVIEWED` (8). New evidence on a closed case moves it to `REOPENED`.
 
-- **Time to contain P0/P1 risk:** Measures speed to a targeted safeguard or specialist escalation, not merely total resolution time.
-- **High-severity triage precision and recall:** Tracks both missed urgent cases and false alarms that overwhelm specialist teams.
-- **Recurrence rate by issue category:** Tests whether mitigations reduce repeated incidents after accounting for relevant usage volume.
+**Separation of concerns on every case**
+* *Potential impact* and *evidence quality / confidence* are assessed separately from severity.
+* The *provider recommendation* (from a model, fixture or simulation) is stored separately from the *recommendation after deterministic controls*.
+* The *human-confirmed severity* lives only on the incident and is never overwritten by reassessment or rule changes.
 
-Supporting measures can include intake completeness, response quality, evidence-access compliance, appeal outcomes, and agreement between AI summaries and source records.
+**Always-on deterministic controls (`controls-v1.1`)**
 
-## Key tradeoffs
+| ID | Control |
+| --- | --- |
+| C1 | A provider failure, malformed output or schema-invalid output means no assessment is invented. The case goes to manual review, and the labeled rules recommendation is shown. |
+| C2 | Every cited evidence ID must exist in the case. Invalid references are flagged. A valid reference is not treated as proof: claim support is reviewed separately. |
+| C3 | Controls never lower severity. A provider recommendation below the rules recommendation is raised to it. |
+| C4 | Instructions embedded in report text are flagged for review and never followed. |
+| C5 | Low confidence on a potentially high- or critical-impact case triggers mandatory review. Low confidence does not mean low severity. |
+| C6 | If the suggested route differs from a specialist route (Safety, Legal/Privacy, Product Security), the specialist route is kept and the case is flagged. |
 
-- **Speed vs. certainty:** Use reversible containment while investigation continues.
-- **Automation vs. context:** Let AI reduce reading and routing burden, while humans verify consequential facts.
-- **Safety vs. user disruption:** Prefer capability-level restrictions and rapid review over unnecessarily broad lockouts.
-- **Transparency vs. sensitive detail:** Give users a useful explanation without exposing private data, harmful instructions, or unverified claims.
-- **Specialist attention vs. queue health:** Use clear thresholds and calibration to prevent both over-escalation and missed risk.
+**Human accountability is enforced in the service layer, not the UI:**
+* Only Risk Ops or the Incident Lead can decide severity.
+* Overrides need a reason code and a written rationale.
+* P0/P1 decisions must list the source evidence that was reviewed.
+* P0/P1 containment and closure need the Incident Lead. Account lockout is allowed only for human-confirmed P0.
+* Drafts flagged for Legal/Privacy or Safety need that specialist's approval.
+* The AI/system actor can only assess, propose and draft.
 
-## Scope and provenance
+Tests call the services directly to confirm these checks can't be bypassed.
 
-This repository presents a generalized, independently written case study. It is intended for discussion and portfolio purposes only.
+**Other capabilities**
+* Manual and JSON intake, with explicit unknowns.
+* Related-report suggestions with explanations. A reviewer confirms each link; evidence is never merged or suppressed.
+* Evidence-referenced communication drafts: executive brief, cross-functional handoff, user acknowledgment and closure summary. All are marked NOT SENT and keep version history.
+* Simulated containment with review and expiry times, reversal, and automatic expiry.
+* Operational monitoring that keeps seeded history separate from demo actions, reports repeat issues as counts only, and uses configurable prototype SLA targets (`config/sla.json`).
+* A regression gate and quality alert that compares rule versions on the frozen held-out split.
 
-## Status
+## Evaluation status (what actually ran)
 
-Conceptual case study. No production implementation or performance claims are implied.
+The evaluation uses 80 synthetic cases in 23 scenario families: 44 development cases and 36 held-out cases, split by family. The held-out set was frozen with a SHA-256 hash **before any tuning** (`data/eval/FREEZE.json`, which also records one disclosed title-neutrality edit made before any held-out run). Labels are **provisional author judgments**, not validated ground truth.
+
+| Rules-only (deterministic) | v1.0 dev | v1.1 dev* | v1.0 held-out | v1.1 held-out |
+| --- | --- | --- | --- | --- |
+| Severity within acceptable range | 35/44 | 44/44 | 29/36 | 31/36 |
+| P0/P1 recall | 14/16 | 15/16 | **13/14** | **12/14** |
+| P0/P1 precision | 14/17 | 15/16 | 13/16 | 12/14 |
+| Route acceptable | 36/44 | 43/44 | 32/36 | 33/36 |
+| Mandatory-review compliance | 18/22 | 22/22 | 18/23 | 18/23 |
+
+\*rules-v1.1 was written from the v1.0 dev failures, so its dev results are optimistic by construction. On held-out data, v1.1 put more cases in the acceptable severity range but **lost one P0/P1 case** (EVAL-048). The regression gate flags this, and it is documented rather than tuned away. The rules-v1.0 baseline remains the active default.
+
+* **Live-model evaluation: pending.** No `ANTHROPIC_API_KEY` was available. The harness, prompts (`prompt-v1`, `prompt-v2`), schema validation, cost and latency capture, and refusal/timeout handling are implemented and tested with mocked clients. The exact command is in the table above.
+* **Claim-support accuracy: not reported.** No human reviews were recorded. Blank worksheets are written with every run.
+* **Fault-injection runs** (labeled as such) confirm the safeguards. With a provider that under-calls every case as P3, P0/P1 recall before controls is 0/30 and after controls is 27/30. Timeouts, malformed JSON and schema violations are all routed to manual review (80/80 each).
+
+Full method, results, observed failures and limitations: [`docs/evaluation.md`](docs/evaluation.md).
+
+## Documentation
+
+| Document | Contents |
+| --- | --- |
+| [docs/framework.md](docs/framework.md) | Original conceptual framework (preserved source document) |
+| [docs/architecture.md](docs/architecture.md) | Architecture, modules, data model, state machine, controls |
+| [docs/versioning.md](docs/versioning.md) | Rule, prompt and control versioning; governance of rule changes |
+| [docs/evaluation.md](docs/evaluation.md) | Evaluation methodology, results, observed failures, fault injection, limitations |
+| [docs/demo_walkthrough.md](docs/demo_walkthrough.md) | Five-minute demo script with screenshots |
+| [docs/case_study.md](docs/case_study.md) | Decisions and tradeoffs |
+| [docs/requirements_traceability.md](docs/requirements_traceability.md) | Requirement → code / test / result table |
+| [docs/timed_review_protocol.md](docs/timed_review_protocol.md) | Optional procedure for a future timed-review user study |
+
+## Repository layout
+
+```text
+riskops/            business logic (no UI code)
+  schemas.py        Pydantic intake and assessment contracts
+  rules.py          versioned deterministic rules engine
+  injection.py      embedded-instruction detection
+  assessment.py     provider → schema → evidence refs → controls
+  providers/        offline fixture/simulation, live Anthropic, fault injection
+  prompts/          prompt-v1.md, prompt-v2.md
+  workflow.py       state machine, decisions, containment, closure, links, permissions
+  communications.py evidence-referenced drafts (never sent)
+  monitoring.py     queue, ops metrics, regression gate
+  evaluation.py     evaluation harness and metrics
+  db.py, seed.py, cli.py
+app/                Streamlit UI (views call riskops services only)
+playbooks/          rules_v1.0.json, rules_v1.1.json, rules_v1.1-fault-demo.json
+config/sla.json     prototype SLA assumptions
+data/eval/          cases.jsonl, labels.jsonl, splits.json, FREEZE.json
+data/demo/          seed incidents and the walkthrough intake example
+fixtures/           hand-authored assessment fixtures (labeled, not model outputs)
+evaluation/results/ evaluation artifacts from the runs listed above
+tests/              pytest suite
+docs/               documentation and screenshots
+```
+
+## Project status
+
+* **Implemented and tested locally:** the full workflow, UI, rules v1.0/v1.1, controls, offline providers, the fault-injection harness, the evaluation harness, and the seed/reset command. There are 53 automated tests passing, plus 1 strict expected-failure that documents a known rules-v1.1 limitation. A browser smoke test covered every view, and the seven-step demo was driven end to end through the UI in headless Chromium.
+* **Simulated:** containment, communications, identities and roles, historical timestamps (seeded), and offline AI outputs.
+* **Unvalidated:** labels (single author), live-model quality (not run), claim-support accuracy (no reviews), and any time-savings claim (no study; see the protocol).

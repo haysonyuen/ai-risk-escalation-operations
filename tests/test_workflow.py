@@ -255,3 +255,9 @@ def test_executive_brief_contains_required_sections(conn, actors):
     for s in ("Severity:", "Impact", "Facts from evidence", "Uncertainty", "Actions", "Next decision"):
         assert s in body
     assert "NOT YET CONFIRMED" in body and "Legal/Privacy" in req and "Safety" in req and refs
+
+
+def test_future_reported_at_is_rejected(conn, actors):
+    future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    with pytest.raises(wf.WorkflowError, match="future"):
+        wf.create_incident(conn, make_intake(reported_at=future), actors["casey.support"])

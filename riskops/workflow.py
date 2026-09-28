@@ -211,6 +211,8 @@ def create_incident(conn, intake: IncidentIntake, actor: Actor, origin: str = "d
     if row(conn, "SELECT 1 FROM incidents WHERE incident_id=?", (intake.incident_id,)):
         raise WorkflowError(f"Incident {intake.incident_id} already exists")
     ts = created_at or now_iso()
+    if intake.reported_at > utcnow() + timedelta(minutes=5):
+        raise WorkflowError("reported_at is in the future; check the timestamp and timezone")
     data = intake.model_dump(mode="json")
     evidence = data.pop("evidence")
     conn.execute(
