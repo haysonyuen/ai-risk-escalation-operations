@@ -1,0 +1,7 @@
+[theme]
+# The interface's badges and panels are designed for a light background.
+base = "light"
+primaryColor = "#d9473a"
+
+[browser]
+gatherUsageStats = false

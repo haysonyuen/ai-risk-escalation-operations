@@ -6,6 +6,14 @@ import streamlit as st
 
 st.set_page_config(page_title="Risk & Escalation Ops", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
 
+_v = tuple(int(x) for x in st.__version__.split(".")[:2])
+if _v < (1, 50):
+    st.error(f"This app needs Streamlit 1.50 or newer, but it is running on Streamlit {st.__version__} "
+             "(probably a global/Anaconda install). In the project folder run:\n\n"
+             "`source .venv/bin/activate` then `pip install -r requirements.txt` then "
+             "`python -m streamlit run app/streamlit_app.py`")
+    st.stop()
+
 import common  # noqa: E402  (adds repo root to sys.path)
 import page_case  # noqa: E402
 import page_dashboard  # noqa: E402

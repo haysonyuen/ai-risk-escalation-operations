@@ -16,7 +16,7 @@ Requires Python 3.10+.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python -m riskops.cli seed                 # create data/riskops.db with 12 synthetic incidents
-streamlit run app/streamlit_app.py         # http://localhost:8501
+python -m streamlit run app/streamlit_app.py   # http://localhost:8501 (python -m uses this venv, not a global/Anaconda streamlit)
 ```
 
 Everything runs offline. For the optional live model mode, copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` (and optionally `RISKOPS_LIVE_MODEL`). If the key is missing, live mode **fails visibly**: cases go to manual review, and live evaluation refuses to run. It never falls back to offline results silently.
