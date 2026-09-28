@@ -1,0 +1,14 @@
+{
+  "label": "PROTOTYPE ASSUMPTION - demo values only",
+  "note": "These numeric targets were chosen for this prototype. They are not any company's policy and are not specified by the original framework, which states postures only (P0: same-hour human review; P1: same-day investigation). Edit this file to change them.",
+  "version": "sla-demo-1",
+  "targets_minutes": {
+    "P0": {"first_human_review": 60, "containment_or_escalation": 60},
+    "P1": {"first_human_review": 240, "containment_or_escalation": 480},
+    "P2": {"first_human_review": 1440, "containment_or_escalation": null},
+    "P3": {"first_human_review": 4320, "containment_or_escalation": null}
+  },
+  "unconfirmed_case_basis": "Before a human confirms severity, deadlines use the control-adjusted AI recommendation; if no assessment exists (e.g. provider failure) the P1 target is used so the case is not left without a deadline.",
+  "containment_default_review_hours": 24,
+  "containment_default_expiry_hours": 72
+}

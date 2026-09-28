@@ -4,3 +4,12 @@ source*
 original*
 draft*
 notes*
+
+# Local environment and runtime state
+.venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+data/*.db
+data/*.db-*
