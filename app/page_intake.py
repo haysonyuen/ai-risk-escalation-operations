@@ -26,6 +26,38 @@ def _after_create(iid: str, assess: bool) -> None:
     go_case(iid)
 
 
+def _check_form(title: str, behavior: str, iid: str, ev_df: pd.DataFrame) -> list[str]:
+    """Plain-language checks before building the intake, so people see what to fix."""
+    import re
+    problems = []
+    if not (title or "").strip():
+        problems.append("**Short title** is required.")
+    if not (behavior or "").strip():
+        problems.append("**What was reported** is required: describe what the assistant did.")
+    iid = (iid or "").strip()
+    if not iid:
+        problems.append("**Incident ID** is required.")
+    elif not re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", iid):
+        problems.append("**Incident ID** may only use letters, numbers and . _ : - (no spaces).")
+    elif rows(conn(), "SELECT 1 FROM incidents WHERE incident_id=?", (iid,)):
+        problems.append(f"**Incident ID** {iid} already exists; choose another.")
+    ids = []
+    for n, r in enumerate(ev_df.to_dict("records"), start=1):
+        content = str(r.get("Content") or "").strip()
+        eid = str(r.get("ID") or "").strip()
+        if not content:
+            continue  # rows without content are skipped
+        if not eid or eid == "None":
+            problems.append(f"**Evidence row {n}** has content but no ID (e.g. E{n}).")
+        elif not re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", eid):
+            problems.append(f"**Evidence row {n}** ID “{eid}” may only use letters, numbers and . _ : -")
+        ids.append(eid)
+    dup = sorted({x for x in ids if x and ids.count(x) > 1})
+    if dup:
+        problems.append(f"**Evidence IDs** must be unique: {', '.join(dup)} is used more than once.")
+    return problems
+
+
 def render() -> None:
     st.title("New report")
     st.caption("Use synthetic data only. Leave anything you don't know as **unknown** — it stays visibly unknown on the case. "
@@ -60,7 +92,8 @@ def render() -> None:
             reversibility = c4.selectbox("Reversible?", ["unknown", "reversible", "partially_reversible", "irreversible"], format_func=pretty)
 
             st.markdown("##### Evidence")
-            st.caption("One row per record. IDs must be unique and are permanent.")
+            st.caption("One row per record. IDs must be unique and are permanent. Rows with empty content are skipped. "
+                       "Evidence is optional, but without it the case is rated on the report alone.")
             ev_df = st.data_editor(
                 pd.DataFrame([{"ID": "E1", "Type": "reporter_statement", "Source": "Reporter statement", "Content": ""}]),
                 num_rows="dynamic", use_container_width=True, hide_index=True,
@@ -72,9 +105,13 @@ def render() -> None:
             o1, o2, o3 = st.columns([2, 2, 1])
             owners = ["(unassigned)"] + [x.actor_id for x in wf.SIMULATED_ACTORS]
             owner = o1.selectbox("Owner", owners)
-            iid = o2.text_input("Incident ID", value=f"INC-{datetime.now(timezone.utc).strftime('%m%d%H%M')}")
+            iid = o2.text_input("Incident ID", value=f"INC-{datetime.now(timezone.utc).strftime('%m%d%H%M%S')}")
             assess = o3.checkbox("Run AI assessment", value=True)
             if st.form_submit_button("Create report", type="primary", disabled=bool(hint)):
+                problems = _check_form(title, behavior, iid, ev_df)
+                if problems:
+                    st.error("Please fix the following before creating the report:\n" + "\n".join(f"- {x}" for x in problems))
+                    return
                 evidence = [{"evidence_id": str(r["ID"]).strip(), "source_type": r["Type"], "source_description": (r["Source"] or "unspecified"),
                              "content": r["Content"]} for _, r in ev_df.iterrows() if str(r.get("Content") or "").strip()]
                 data = {"incident_id": iid, "reported_at": datetime.now(timezone.utc).isoformat(), "title": title,

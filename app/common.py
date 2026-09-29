@@ -302,6 +302,41 @@ def go(page: str) -> None:
 
 # --------------------------------------------------------------------------- feedback
 
+FORM_FIELD_LABEL = {
+    "title": "Short title", "reported_behavior": "What was reported", "incident_id": "Incident ID",
+    "reported_at": "Reported time", "evidence": "Evidence", "evidence_id": "Evidence ID", "content": "Evidence content",
+    "source_description": "Evidence source", "source_type": "Evidence type", "root_cause": "Root cause",
+    "user_customer_impact": "User / customer impact", "actions_taken": "Actions taken", "sign_off_statement": "Sign-off statement",
+    "remaining_mitigation": "Remaining mitigation", "response_status": "Response status", "evidence_reviewed": "Evidence reviewed",
+    "teams_involved": "Teams involved",
+}
+
+
+def friendly_error(e: Exception) -> str:
+    """Plain-language message for validation errors instead of a raw technical dump."""
+    from pydantic import ValidationError
+    if not isinstance(e, ValidationError):
+        return f"Something went wrong: {e}"
+    lines = []
+    for err in e.errors():
+        loc = [x for x in err["loc"] if not isinstance(x, int)]
+        rows = [x for x in err["loc"] if isinstance(x, int)]
+        field = " → ".join(FORM_FIELD_LABEL.get(str(x), pretty(x)) for x in loc) or "Input"
+        if rows:
+            field += f" (row {rows[0] + 1})"
+        kind = err.get("type", "")
+        if kind in ("string_too_short", "missing", "too_short"):
+            msg = "is required"
+        elif kind == "string_pattern_mismatch":
+            msg = "may only use letters, numbers and . _ : -"
+        elif kind == "literal_error":
+            msg = "has a value that isn't one of the allowed options"
+        else:
+            msg = err.get("msg", "is invalid").removeprefix("Value error, ")
+        lines.append(f"- **{field}** {msg}")
+    return "Please fix the following:\n" + "\n".join(dict.fromkeys(lines))
+
+
 def run_action(fn, success: str | None = None, area: str = "global") -> bool:
     """Call a service. Success → toast after rerun. Failure → message shown inline at ``area``."""
     try:
@@ -313,7 +348,7 @@ def run_action(fn, success: str | None = None, area: str = "global") -> bool:
         st.session_state.setdefault("_errors", {})[area] = str(e)
         return False
     except Exception as e:  # pydantic validation etc.
-        st.session_state.setdefault("_errors", {})[area] = f"{type(e).__name__}: {e}"
+        st.session_state.setdefault("_errors", {})[area] = friendly_error(e)
         return False
     st.session_state.get("_errors", {}).pop(area, None)
     if success:
@@ -416,7 +451,7 @@ def run_inline(fn, success: str | None = None) -> bool:
         st.error(("Not permitted: " if isinstance(e, wf.PermissionDenied) else "") + str(e))
         return False
     except Exception as e:
-        st.error(f"{type(e).__name__}: {e}")
+        st.error(friendly_error(e))
         return False
     if success:
         st.session_state.setdefault("_toasts", []).append(success)
