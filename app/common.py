@@ -212,7 +212,7 @@ def open_conn() -> None:
             old.close()
         except Exception:
             pass
-    from riskops.seed import ensure_seeded
+    from riskops.demo_db import ensure_seeded
     path = ensure_seeded(db_file())
     st.session_state["_conn"] = connect(path)
 

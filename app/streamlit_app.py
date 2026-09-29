@@ -65,7 +65,7 @@ with st.sidebar:
         st.caption(f"Active rules `{get_setting(c, 'active_rule_version')}` · prompt `{get_setting(c, 'active_prompt_version')}`")
         if st.checkbox("Allow reset", key="confirm_reset"):
             if st.button("Reset demo data"):
-                from riskops.seed import seed_atomic
+                from riskops.demo_db import seed_atomic
                 st.session_state.pop("_conn").close()
                 seed_atomic(common.db_file())
                 for k in [k for k in st.session_state if k not in ("actor_id", "_pages", "_db_file")]:
