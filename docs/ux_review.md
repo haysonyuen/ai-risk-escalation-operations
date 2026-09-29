@@ -81,3 +81,7 @@ Looking at the app as a first-time visitor arriving from a link turned up five i
 4. **Crowded sidebar.** The public-demo notice is now a one-line caption instead of a large panel.
 5. **Table-only dashboard.** Issue categories are a bar chart, and override directions use plain words ("severity raised", "only the owning team changed").
 6. **Actions scrolled away while reading.** On the case page, the action panel (decision, owner and stage, containment, communications, closure) is pinned on desktop and scrolls independently of the case file. On narrow screens it stays stacked below the case file.
+
+**Follow-up after user feedback.** The start-here tour and the "Act as …" buttons were removed: they added clutter and could confuse, and the "you can do this / needs …" hints plus *Working as* are enough. Added instead:
+* a workflow-stage view on the dashboard: a stacked bar chart by severity, pills to filter stages and severities, and a sortable list of the matching cases (click a row to open it);
+* stage filtering and a sort menu (urgency, severity, workflow stage, age) on the queue, with a combined "Stage · status" column.

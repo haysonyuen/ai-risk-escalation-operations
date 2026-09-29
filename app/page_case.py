@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import streamlit as st
 
-from common import (action_label, humanize, switch_role_buttons, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
+from common import (action_label, humanize, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
                     TEAMS, actor_name, ago, badge, conn, current_actor, describe_event, esc, feedback, go, md,
                     permission_hint, pretty, provider_for_mode, relative, run_action, run_inline, section, sev_badge,
                     source_badge, stepper)
@@ -617,7 +617,6 @@ def render() -> None:
             items.append(f"<li><b>{esc(x['title'])}</b> — {esc(x['detail'])} "
                          + (badge("you can do this", "b-human") if mine else badge("needs " + wf.who_can_do(x), "b-muted")) + "</li>")
         md(f'<div class="next{" ok" if not any(x["urgent"] for x in acts) else ""}"><b>Next</b><ul style="margin:4px 0 0 0">{"".join(items)}</ul></div>')
-        switch_role_buttons(acts, key=f"sw_{iid}")
 
     left, right = st.columns([3, 2], gap="large")
     with left:

@@ -42,14 +42,14 @@ Everything runs offline. For the optional live model mode, copy `.env.example` t
 
 ### Using the interface
 
-* **Start here**: the queue opens with a short tour. Each button opens a case that shows one idea (an automatic pause, AI vs. safety controls, a triage decision, a related report) and switches to the right role for you. **Hide** puts it away.
-* **Queue** (home page): the cases that need action, most urgent first, with colour-coded severity. Click a row to open it. The **Filters** popover narrows by severity, category, owner or review flag, and **How to read this** explains the symbols.
+* **Queue** (home page): the cases that need action, most urgent first, with colour-coded severity and each case's workflow stage. Click a row to open it. The **Filters** popover narrows by severity, workflow stage, category, owner or review flag. The **Sort** menu orders by urgency, severity, workflow stage or age. **How to read this** explains the symbols.
 * **Case**: the whole case on one screen.
-  * The **Next** panel says what the case needs and whether your role can do it. If it's someone else's step, one click (**Act as …**) switches to that role.
+  * The **Next** panel says what the case needs and whether your role can do it.
   * The left side is the case file: the report, the AI assessment with each claim shown beside the evidence it cites, evidence, activity, related reports and AI details.
   * The right side holds the actions: the severity and routing decision, owner and stage, containment, draft communications, and closure. On desktop this panel stays pinned in view and scrolls on its own, so the actions stay beside the evidence you're reading. Controls your role can't use are disabled, with the reason shown.
 * **New report**: a structured form, or JSON import.
-* **Dashboard**, **Quality & evaluation**, **Rules & playbooks**: oversight, metrics and rule governance.
+* **Dashboard**: tickets by workflow stage (Intake → QA), split by severity, with stage and severity filters and a sortable list of the matching cases. Below that are timeliness, automatic pauses, overrides, categories and AI health.
+* **Quality & evaluation**, **Rules & playbooks**: evaluation results and rule governance.
 * **Working as** (sidebar): switch between simulated roles to see the approval rules in action. This is not a login.
 
 | Task | Command |

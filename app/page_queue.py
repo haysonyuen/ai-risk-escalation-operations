@@ -3,47 +3,22 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from common import (ACTORS, CATEGORY_LABEL, STATUS_LABEL, _set_actor, actor_name, conn, current_actor, go, go_case,
+from common import (CATEGORY_LABEL, STAGES, STATUS_LABEL, STATUS_STAGE, actor_name, conn, current_actor, go, go_case,
                     relative)
 from riskops import monitoring, workflow as wf
 
 VIEWS = ["Needs action", "My cases", "All open", "Closed", "All"]
+SORTS = {
+    "Most urgent first": lambda x: x["urgency"],
+    "Severity (P0 first)": lambda x: ({"P0": 0, "P1": 1, "P2": 2, "P3": 3}[x["effective_severity"]], x["urgency"]),
+    "Workflow stage (Intake → QA)": lambda x: (STATUS_STAGE[x["status"]], x["urgency"]),
+    "Workflow stage (QA → Intake)": lambda x: (-STATUS_STAGE[x["status"]], x["urgency"]),
+    "Newest first": lambda x: x["age_hours"],
+    "Oldest first": lambda x: -x["age_hours"],
+}
 
-# Guided tour for first-time visitors: (title, what you will see, case, role to act as)
-TOUR = [
-    ("⏸️ An automatic pause", "A P0 child-safety case paused its session by itself. Confirm or lift the pause as the Safety specialist.",
-     "INC-1002", "priya.safety"),
-    ("🛡️ AI vs. safety controls", "The AI under-called an API-key leak as P2. Deterministic controls raised it to P0 and kept the specialist route.",
-     "INC-1004", "alex.riskops"),
-    ("⚖️ Make a triage call", "Decide severity and routing for a jailbreak report. P0/P1 decisions must cite the evidence you reviewed.",
-     "INC-1008", "alex.riskops"),
-    ("🔗 Spot a related report", "A vague complaint that matches a confirmed injection incident. Confirm or reject the suggested link.",
-     "INC-1015", "alex.riskops"),
-]
 SEV_STYLE = {"P0": "background-color:#fde2e1;color:#8a1c1c;font-weight:600", "P1": "background-color:#fdecd8;color:#8a4a0b;font-weight:600",
              "P2": "background-color:#fff6cc;color:#6b5600", "P3": "background-color:#eef1f5;color:#4a5160"}
-
-
-def _tour(existing: set[str]) -> None:
-    if st.session_state.get("tour_hidden"):
-        return
-    with st.container(border=True):
-        a, b = st.columns([6, 1], vertical_alignment="top")
-        a.markdown("**New here? Start with one of these.** Each report about an AI assistant is assessed by an AI, checked by "
-                   "deterministic safety controls, and decided by people with recorded reasons. All data is synthetic; nothing is "
-                   "sent or enforced. Use *Working as* in the sidebar to switch roles, or the buttons below, which pick the right role for you.")
-        if b.button("Hide", key="tour_hide", use_container_width=True):
-            st.session_state["tour_hidden"] = True
-            st.rerun()
-        steps = [t for t in TOUR if t[2] in existing]
-        cols = st.columns(len(steps)) if steps else []
-        for col, (title, text, iid, actor) in zip(cols, steps):
-            with col:
-                st.markdown(f"**{title}**")
-                st.caption(text)
-                name = ACTORS[actor].display.split(" (")[0].split(" —")[0]
-                if st.button(f"Open {iid} as {name}", key=f"tour_{iid}", on_click=_set_actor, args=(actor,), use_container_width=True):
-                    go_case(iid)
 
 
 def render() -> None:
@@ -58,8 +33,6 @@ def render() -> None:
     if btn.button("＋ New report", type="primary", use_container_width=True):
         go("intake")
 
-    _tour({x["incident_id"] for x in q})
-
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Open", len(open_q))
     k2.metric("Overdue first review", sum(x["overdue"] for x in open_q))
@@ -72,6 +45,8 @@ def render() -> None:
     search = s.text_input("Search", placeholder="Search ID or title", label_visibility="collapsed", key="q_search")
     with f.popover("Filters", use_container_width=True):
         sev = st.multiselect("Severity", ["P0", "P1", "P2", "P3"], key="q_sev")
+        stages = st.multiselect("Workflow stage", STAGES, key="q_stage",
+                                help="Intake → AI enrichment → Triage → Investigation → Containment → Response → Closure → QA")
         cats = sorted({cat for x in q for cat in x["categories"]})
         cat = st.multiselect("Category", cats, format_func=lambda k: CATEGORY_LABEL.get(k, k), key="q_cat")
         owners = sorted({x["owner"] for x in q if x["owner"]})
@@ -93,6 +68,8 @@ def render() -> None:
             return False
         if sev and x["effective_severity"] not in sev:
             return False
+        if stages and STAGES[STATUS_STAGE[x["status"]]] not in stages:
+            return False
         if cat and not set(cat) & set(x["categories"]):
             return False
         if owner and (x["owner"] or "(unassigned)") not in owner:
@@ -105,7 +82,10 @@ def render() -> None:
             return False
         return True
 
-    shown = sorted([x for x in q if keep(x)], key=lambda x: x["urgency"])
+    shown = [x for x in q if keep(x)]
+    cap, srt, leg = st.columns([3.2, 2, 1.3], vertical_alignment="center")
+    sort_by = srt.selectbox("Sort", list(SORTS), key="q_sort", label_visibility="collapsed", format_func=lambda k: f"Sort: {k}")
+    shown = sorted(shown, key=SORTS[sort_by])
     rows = []
     basis_short = {"human": "✓", "ai_after_controls": "· AI", "rules_after_ai_failure": "· rules", "unassessed_default": "· default"}
     for x in shown:
@@ -126,13 +106,12 @@ def render() -> None:
             "Flags": " ".join(flags),
             "ID": x["incident_id"],
             "Title": x["title"],
-            "Status": STATUS_LABEL[x["status"]],
+            "Stage · status": f"{STATUS_STAGE[x['status']] + 1} · {STATUS_LABEL[x['status']]}",
             "Next action": (("" if wf.actor_can_do(c, me, nxt) else "🔒 ") + nxt["title"]) if nxt else "—",
             "First review": due,
             "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
         })
-    cap, leg = st.columns([5, 1], vertical_alignment="center")
-    cap.caption(f"{len(rows)} case(s) · most urgent first · click a row to open it")
+    cap.caption(f"{len(rows)} case(s) · sorted by {sort_by[0].lower() + sort_by[1:]} · click a row to open it")
     with leg.popover("How to read this", use_container_width=True):
         st.markdown("""
 **Severity**: P0 critical · P1 high · P2 medium · P3 low
@@ -143,7 +122,9 @@ def render() -> None:
 
 **Flags**: ⏸️ session paused automatically, waiting for a person · ⚑ a person must review · 🧪 fault-injection test data
 
-**Next action**: 🔒 means your current role can't do it. Open the case to switch roles in one click.
+**Next action**: 🔒 means your current role can't do it. Switch roles with *Working as* in the sidebar.
+
+**Stage**: where the case is in the eight-stage workflow. Filter by stage under **Filters**; change the order with the sort menu.
 """)
     if not rows:
         st.info("Nothing here. Try another view or clear the filters.")
@@ -156,9 +137,9 @@ def render() -> None:
         column_config={
             "Severity": st.column_config.TextColumn(width=86, help="✓ = human-confirmed. AI = recommendation after safety controls, not yet confirmed."),
             "ID": st.column_config.TextColumn(width=72),
-            "Title": st.column_config.TextColumn(width=262),
-            "Status": st.column_config.TextColumn(width=128),
-            "Next action": st.column_config.TextColumn(width=200),
+            "Title": st.column_config.TextColumn(width=250),
+            "Stage · status": st.column_config.TextColumn(width=148, help="Workflow stage 1–8 (Intake, AI enrichment, Triage, Investigation, Containment, Response, Closure, QA) and current status"),
+            "Next action": st.column_config.TextColumn(width=186),
             "First review": st.column_config.TextColumn(width=92, help="Time to the first-human-review target (prototype SLA assumptions)"),
             "Owner": st.column_config.TextColumn(width=52),
             "Flags": st.column_config.TextColumn(width=52, help="⏸️ session auto-paused (C7), confirm or lift · ⚑ mandatory human review pending · 🧪 fault-injection test data"),
