@@ -8,7 +8,8 @@ Set `RISKOPS_PUBLIC_DEMO = "1"` when hosting. In this mode:
 
 - every visitor gets a **private, freshly seeded copy** of the demo database, so visitors never see or overwrite each other's changes;
 - a sidebar notice explains this and asks visitors not to enter real personal data;
-- session databases idle for 12 hours are deleted.
+- session databases idle for 12 hours are deleted;
+- the live-model option is removed from the menu, so no API key can be used by visitors even if one is configured.
 
 Without the flag (the default, e.g. on your own laptop), the app uses one persistent local database at `data/riskops.db`.
 

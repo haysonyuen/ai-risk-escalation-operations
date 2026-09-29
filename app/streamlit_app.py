@@ -51,7 +51,8 @@ with st.sidebar:
     if mode != "offline":
         st.warning("Assessment provider: " + ("live model" if mode == "live" else "FAULT INJECTION test"))
     with st.expander("Demo settings"):
-        modes = ["offline", "live"] + [f"fault:{m}" for m in FAULT_MODES]
+        # Public demo: never offer live model calls, even if an API key is configured by mistake.
+        modes = (["offline"] if common.public_demo() else ["offline", "live"]) + [f"fault:{m}" for m in FAULT_MODES]
         labels = {"offline": "Offline (fixtures / simulation)",
                   "live": "Live model" + ("" if config.live_credentials_available() else " — no API key set")}
         labels.update({f"fault:{m}": f"Fault test: {d}" for m, d in FAULT_MODES.items()})
