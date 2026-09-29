@@ -9,6 +9,8 @@
     "P3": {"first_human_review": 4320, "containment_or_escalation": null}
   },
   "unconfirmed_case_basis": "Before a human confirms severity, deadlines use the control-adjusted AI recommendation; if no assessment exists (e.g. provider failure) the P1 target is used so the case is not left without a deadline.",
+  "auto_hold_review_minutes": 60,
+  "auto_hold_note": "C7 automatic session pause (P0 CBRN / child safety): a person must confirm or lift it within this time; it never lifts itself.",
   "containment_default_review_hours": 24,
   "containment_default_expiry_hours": 72
 }

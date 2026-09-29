@@ -121,10 +121,10 @@ def render() -> None:
             st.caption("The held-out split was frozen before tuning. Do not change rules based on held-out failures without recording a disclosure in data/eval/FREEZE.json.")
         if system == "live" and not config.live_credentials_available():
             st.error("Live evaluation is pending: ANTHROPIC_API_KEY is not set. It will not fall back to offline results. Run later with:")
-            st.code("export ANTHROPIC_API_KEY=...\npython -m riskops.cli eval --system live --rules rules-v1.1 --prompt prompt-v2 --split dev --record-in-db")
+            st.code("export ANTHROPIC_API_KEY=...\npython -m riskops.cli eval --system live --rules rules-v2.1 --prompt prompt-v3 --split dev --record-in-db")
         if st.button("Run evaluation"):
             def go():
-                s = evaluation.run_eval(system, version, "prompt-v2", split, out_dir=config.RESULTS_DIR / "ui_runs")
+                s = evaluation.run_eval(system, version, "prompt-v3", split, out_dir=config.RESULTS_DIR / "ui_runs")
                 wf.record_eval_run(conn(), s, origin="demo")
                 return s["run_id"]
             try:

@@ -16,8 +16,11 @@ Controls are always on and independent of rule version:
   C4 embedded instructions in the report -> review (text is never obeyed)
   C5 low confidence on a potentially high/critical-impact case -> review (low confidence is
      never treated as low severity)
-  C6 route disagreement on a specialist queue (safety / legal_privacy / product_security) ->
-     the specialist route is kept and the case is flagged
+  C6 route disagreement on a specialist queue (safety / child_safety / threat_intel /
+     legal_privacy / product_security) -> the specialist route is kept and the case is flagged
+  C7 auto-hold: controlled severity P0 and a CBRN or child-safety category (from the rules OR
+     the provider) -> the reported session is paused automatically (simulated) and a human must
+     confirm or lift it. Either source can trigger it; neither can cancel it.
 """
 
 from __future__ import annotations
@@ -29,13 +32,15 @@ from pydantic import ValidationError
 
 from . import rules as rules_mod
 from .providers.base import AssessmentProvider
-from .schemas import SEVERITY_ORDER, AssessmentOutput, IncidentIntake, severity_max
+from .schemas import AUTO_HOLD_CATEGORIES, SEVERITY_ORDER, AssessmentOutput, IncidentIntake, severity_max
 
-SPECIALIST_ROUTES = {"safety", "legal_privacy", "product_security"}
+SPECIALIST_ROUTES = {"safety", "child_safety", "threat_intel", "legal_privacy", "product_security"}
 # Version of the always-on controls (C1-C6) and the embedded-instruction detector.
 # controls-v1.0 -> v1.1: role labels inside conversation excerpts no longer count as
 # impersonation (false positive observed on seeded demo case INC-1001).
-CONTROLS_VERSION = "controls-v1.1"
+# controls-v1.1 -> v1.2: C7 automatic session pause for P0 CBRN / child-safety cases; specialist
+# routes for C6 extended to child_safety and threat_intel (taxonomy v2).
+CONTROLS_VERSION = "controls-v1.2"
 
 
 def _reason(code: str, text: str, source: str = "control") -> dict:
@@ -134,6 +139,24 @@ def assess_incident(incident: IncidentIntake, provider: AssessmentProvider, rule
         reasons.append(_reason("C5", f"Potential impact {impact} with {confidence} confidence / {quality} evidence: do not downgrade without evidence review"))
         controls.append({"id": "C5", "effect": "flagged", "detail": "low confidence does not imply low severity"})
 
+    categories = list(rr.categories)
+    if output is not None:
+        categories += [c for c in output.risk_categories if c not in categories]
+    auto_hold = None
+    hold_cats = sorted(AUTO_HOLD_CATEGORIES & set(categories))
+    if controlled_sev == "P0" and hold_cats:
+        trigger = []
+        if AUTO_HOLD_CATEGORIES & set(rr.categories) and rr.severity == "P0":
+            trigger.append("rules")
+        if output is not None and AUTO_HOLD_CATEGORIES & set(output.risk_categories) and output.recommended_severity == "P0":
+            trigger.append(pres.provider_kind)
+        trigger = trigger or ["combined"]  # e.g. rules say P0 for another reason, provider adds the category
+        label = " / ".join(c.replace("cbrn", "CBRN").replace("child_safety", "child safety") for c in hold_cats)
+        auto_hold = {"target": "the reported conversation/session", "categories": hold_cats, "trigger": trigger,
+                     "reason": f"P0 {label} recommendation ({' + '.join(trigger)}): session paused pending human review"}
+        reasons.append(_reason("C7", f"Automatic pause applied (P0 {label}); a person must confirm or lift it"))
+        controls.append({"id": "C7", "effect": "auto_hold", "detail": auto_hold["reason"]})
+
     # de-duplicate reasons while keeping order
     seen, uniq = set(), []
     for r in reasons:
@@ -152,6 +175,8 @@ def assess_incident(incident: IncidentIntake, provider: AssessmentProvider, rule
         mandatory_review=bool(uniq),
         review_reasons=uniq,
         controls=controls,
+        categories=categories,
+        auto_hold=auto_hold,
     )
     return record
 

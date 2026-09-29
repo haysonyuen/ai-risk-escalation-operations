@@ -22,8 +22,8 @@ from . import config
 from .assessment import assess_incident, is_downgrade
 from .db import get_setting, log_event, now_iso, row, rows, set_setting, utcnow
 from .rules import available_versions
-from .schemas import (REVERSIBLE_CONTAINMENT, SEVERITIES, SEVERITY_ORDER, ContainmentType, Evidence,
-                      IncidentIntake)
+from .schemas import (CONTAINMENT_TYPES, IRREVERSIBLE_CONTAINMENT, REVERSIBLE_CONTAINMENT, SEVERITIES,
+                      SEVERITY_ORDER, ContainmentType, Evidence, IncidentIntake)
 
 
 class WorkflowError(Exception):
@@ -53,7 +53,7 @@ class Actor:
 ROLE_LABELS = {
     "risk_ops_analyst": "Risk Ops Analyst",
     "incident_lead": "Incident Lead",
-    "safety_specialist": "Safety Specialist",
+    "safety_specialist": "Safety & Child Safety Specialist",
     "legal_privacy": "Legal/Privacy Reviewer",
     "support_agent": "Support Agent",
     "engineering": "Engineering On-call",
@@ -62,7 +62,7 @@ ROLE_LABELS = {
 SIMULATED_ACTORS = [
     Actor("alex.riskops", "Alex — Risk Ops Analyst (simulated)", "risk_ops_analyst"),
     Actor("sam.lead", "Sam — Incident Lead (simulated)", "incident_lead"),
-    Actor("priya.safety", "Priya — Safety Specialist (simulated)", "safety_specialist"),
+    Actor("priya.safety", "Priya — Safety & Child Safety Specialist (simulated)", "safety_specialist"),
     Actor("jordan.legal", "Jordan — Legal/Privacy (simulated)", "legal_privacy"),
     Actor("casey.support", "Casey — Support Agent (simulated)", "support_agent"),
     Actor("lee.eng", "Lee — Engineering On-call (simulated)", "engineering"),
@@ -83,6 +83,7 @@ PERMISSIONS: dict[str, set[str]] = {
     "approve_containment_p2p3": TRIAGE_ROLES,
     "approve_containment_p0p1": {"incident_lead"},
     "end_containment": TRIAGE_ROLES,
+    "review_auto_hold": {"incident_lead", "safety_specialist"},
     "draft_communication": HUMAN_ROLES | {"system"},
     "edit_communication": HUMAN_ROLES,
     "approve_communication_general": TRIAGE_ROLES,
@@ -94,7 +95,7 @@ PERMISSIONS: dict[str, set[str]] = {
     "claim_review": TRIAGE_ROLES | {"safety_specialist", "legal_privacy"},
     "change_rule_version": {"incident_lead"},
 }
-SPECIALIST_REVIEW_ROLE = {"Legal/Privacy": "legal_privacy", "Safety": "safety_specialist"}
+SPECIALIST_REVIEW_ROLE = {"Legal/Privacy": "legal_privacy", "Safety": "safety_specialist", "Child Safety": "safety_specialist"}
 
 
 def require(actor: Actor, permission: str) -> None:
@@ -332,6 +333,8 @@ def run_assessment(conn, incident_id: str, provider, actor: Actor = SYSTEM_ACTOR
         _check_transition(inc["status"], new_status, "assessment")
         _set_status(conn, incident_id, inc["status"], new_status, actor,
                     None if rec["status"] == "valid" else f"AI assessment failed ({rec['error_kind']}); manual review", origin)
+    if rec.get("auto_hold"):
+        apply_auto_hold(conn, incident_id, rec["auto_hold"], origin=origin, ts=ts)
     if inc["human_severity"] and rec["controlled_severity"] and rec["controlled_severity"] != inc["human_severity"]:
         log_event(conn, incident_id=incident_id, actor_id=actor.actor_id, actor_role=actor.role,
                   event_type="ai_human_disagreement", field="severity", previous=inc["human_severity"],
@@ -426,7 +429,7 @@ def propose_containment(conn, incident_id: str, actor: Actor, action_type: Conta
                         rationale: str, source: str = "human", origin: str = "demo") -> str:
     require(actor, "propose_containment")
     get_incident(conn, incident_id)
-    if action_type not in REVERSIBLE_CONTAINMENT and action_type != "account_lockout":
+    if action_type not in CONTAINMENT_TYPES:
         raise WorkflowError(f"Unknown containment type {action_type}")
     if not target.strip() or not rationale.strip():
         raise WorkflowError("Containment proposals need a target and rationale")
@@ -461,8 +464,12 @@ def decide_containment(conn, action_id: str, actor: Actor, approve: bool, reason
     if approve and act["action_type"] == "account_lockout":
         if not (inc["human_severity"] == "P0"):
             raise WorkflowError("Account lockout is reserved for human-confirmed P0 (high-confidence active abuse)")
+    if approve and act["action_type"] in IRREVERSIBLE_CONTAINMENT:
+        if inc["human_severity"] not in ("P0", "P1"):
+            raise WorkflowError(f"{act['action_type'].replace('_', ' ')} cannot be undone: it needs a human-confirmed P0/P1 first")
+        require(actor, "approve_containment_p0p1")
         if len(reason.strip()) < 30:
-            raise WorkflowError("Account lockout requires a detailed rationale (30+ characters)")
+            raise WorkflowError(f"{act['action_type'].replace('_', ' ')} cannot be undone: give a detailed rationale (30+ characters)")
     now = utcnow()
     cfg = config.sla_config()
     review_by = review_by or now + timedelta(hours=cfg["containment_default_review_hours"])
@@ -487,6 +494,8 @@ def end_containment(conn, action_id: str, actor: Actor, reason: str, origin: str
     act = row(conn, "SELECT * FROM containment_actions WHERE action_id=?", (action_id,))
     if not act or act["status"] != "active":
         raise WorkflowError("Only active containment can be reversed")
+    if act["proposed_source"] == "auto_hold" and not act["hold_review_outcome"]:
+        raise WorkflowError("This is an unreviewed automatic pause: confirm or lift it (Incident Lead or Safety specialist)")
     if len(reason.strip()) < 5:
         raise WorkflowError("A reason is required to reverse containment")
     conn.execute("UPDATE containment_actions SET status='reversed', ended_at=?, ended_by=?, end_reason=? WHERE action_id=?",
@@ -495,6 +504,71 @@ def end_containment(conn, action_id: str, actor: Actor, reason: str, origin: str
               field=f"containment:{action_id}", previous="active", new="reversed", reason=reason.strip(), origin=origin,
               details={"simulated": True})
     conn.commit()
+
+
+# C7 auto-hold ---------------------------------------------------------------------------
+# For P0 CBRN / child-safety recommendations the system pauses the reported session at once
+# (the smallest reversible action), then a human must confirm or lift it. Anything stronger
+# (account suspension, mandatory external report) stays a human decision. Fail closed: an
+# unreviewed hold never expires or lifts itself; past its review time it escalates.
+
+
+def apply_auto_hold(conn, incident_id: str, hold: dict, origin: str = "demo", ts: str | None = None) -> str | None:
+    """Apply the C7 decision computed by the assessment pipeline. Idempotent per incident."""
+    existing = row(conn, "SELECT action_id FROM containment_actions WHERE incident_id=? AND proposed_source='auto_hold'"
+                         " AND status='active'", (incident_id,))
+    if existing:
+        return None
+    ts = ts or now_iso()
+    review_by = datetime.fromisoformat(ts) + timedelta(minutes=config.sla_config()["auto_hold_review_minutes"])
+    aid = f"CA-{uuid.uuid4().hex[:8]}"
+    conn.execute("INSERT INTO containment_actions(action_id, incident_id, action_type, target, rationale, reversible,"
+                 " proposed_by, proposed_source, proposed_at, status, decided_by, decided_at, decision_reason, review_by,"
+                 " expires_at, simulated) VALUES (?,?,?,?,?,1,?,?,?,?,?,?,?,?,NULL,1)",
+                 (aid, incident_id, "pause_interaction", hold["target"], hold["reason"], SYSTEM_ACTOR.actor_id, "auto_hold",
+                  ts, "active", SYSTEM_ACTOR.actor_id, ts, "C7 automatic hold: " + hold["reason"],
+                  review_by.isoformat(timespec="seconds")))
+    log_event(conn, incident_id=incident_id, actor_id=SYSTEM_ACTOR.actor_id, actor_role="system", event_type="auto_hold_applied",
+              field=f"containment:{aid}", new="active", reason=hold["reason"], origin=origin, ts=ts,
+              details={"control": "C7", "action_type": "pause_interaction", "trigger": hold["trigger"],
+                       "categories": hold["categories"], "review_by": review_by.isoformat(), "simulated": True})
+    return aid
+
+
+def review_auto_hold(conn, action_id: str, actor: Actor, keep: bool, reason: str, origin: str = "demo") -> None:
+    """A human confirms (keeps) or lifts an automatic pause. Lifting needs a written reason."""
+    require(actor, "review_auto_hold")
+    act = row(conn, "SELECT * FROM containment_actions WHERE action_id=?", (action_id,))
+    if not act or act["proposed_source"] != "auto_hold":
+        raise WorkflowError("Not an automatic hold")
+    if act["status"] != "active" or act["hold_review_outcome"]:
+        raise WorkflowError("This automatic hold has already been reviewed")
+    if len(reason.strip()) < (5 if keep else 20):
+        raise WorkflowError("Confirming needs a reason" if keep else
+                            "Lifting an automatic CBRN/child-safety pause needs a written reason (20+ characters)")
+    ts = now_iso()
+    cfg = config.sla_config()
+    outcome = "confirmed" if keep else "lifted"
+    if keep:
+        review_by = utcnow() + timedelta(hours=cfg["containment_default_review_hours"])
+        conn.execute("UPDATE containment_actions SET hold_review_outcome=?, hold_reviewed_by=?, hold_reviewed_at=?, review_by=?"
+                     " WHERE action_id=?", (outcome, actor.actor_id, ts, review_by.isoformat(timespec="seconds"), action_id))
+    else:
+        conn.execute("UPDATE containment_actions SET hold_review_outcome=?, hold_reviewed_by=?, hold_reviewed_at=?, status='reversed',"
+                     " ended_at=?, ended_by=?, end_reason=? WHERE action_id=?",
+                     (outcome, actor.actor_id, ts, ts, actor.actor_id, reason.strip(), action_id))
+    if not get_incident(conn, act["incident_id"])["first_human_review_at"]:
+        conn.execute("UPDATE incidents SET first_human_review_at=? WHERE incident_id=?", (ts, act["incident_id"]))
+    log_event(conn, incident_id=act["incident_id"], actor_id=actor.actor_id, actor_role=actor.role,
+              event_type=f"auto_hold_{outcome}", field=f"containment:{action_id}", previous="active",
+              new="active" if keep else "reversed", reason=reason.strip(), origin=origin,
+              details={"control": "C7", "simulated": True})
+    conn.commit()
+
+
+def pending_auto_holds(conn, incident_id: str | None = None) -> list[dict]:
+    sql = "SELECT * FROM containment_actions WHERE proposed_source='auto_hold' AND status='active' AND hold_review_outcome IS NULL"
+    return rows(conn, sql + (" AND incident_id=?" if incident_id else ""), (incident_id,) if incident_id else ())
 
 
 def expire_due_containment(conn, now: datetime | None = None) -> int:
@@ -516,16 +590,18 @@ def expire_due_containment(conn, now: datetime | None = None) -> int:
 # ---------------------------------------------------------------------------------------
 
 CLOSURE_CATEGORIES = [
-    "confirmed_safety_incident", "privacy_sensitive_data_incident", "product_defect", "ux_approval_issue",
-    "prompt_injection", "user_misunderstanding_no_defect", "insufficient_evidence", "duplicate_known_issue",
+    "confirmed_safety_incident", "confirmed_misuse_actor", "coordinated_abuse", "privacy_sensitive_data_incident",
+    "security_vulnerability", "prompt_injection", "model_behavior_issue", "product_defect", "ux_approval_issue",
+    "classifier_false_positive", "user_misunderstanding_no_defect", "insufficient_evidence", "duplicate_known_issue",
 ]
 
 
 class ClosureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
     closure_category: Literal[
-        "confirmed_safety_incident", "privacy_sensitive_data_incident", "product_defect", "ux_approval_issue",
-        "prompt_injection", "user_misunderstanding_no_defect", "insufficient_evidence", "duplicate_known_issue"]
+        "confirmed_safety_incident", "confirmed_misuse_actor", "coordinated_abuse", "privacy_sensitive_data_incident",
+        "security_vulnerability", "prompt_injection", "model_behavior_issue", "product_defect", "ux_approval_issue",
+        "classifier_false_positive", "user_misunderstanding_no_defect", "insufficient_evidence", "duplicate_known_issue"]
     final_severity: Literal["P0", "P1", "P2", "P3"]
     root_cause: str = Field(min_length=5)
     user_customer_impact: str = Field(min_length=5)
@@ -810,6 +886,8 @@ def closure_blockers(conn, incident_id: str) -> list[str]:
     n = len(rows(conn, "SELECT 1 FROM containment_actions WHERE incident_id=? AND status='proposed'", (incident_id,)))
     if n:
         out.append(f"{n} containment proposal(s) awaiting a decision")
+    if pending_auto_holds(conn, incident_id):
+        out.append("An automatic pause (C7) has not been confirmed or lifted")
     for c in latest_communications(conn, incident_id):
         spec = json.loads(c["specialist_review_json"])
         if spec["required"] and c["status"] == "draft":
@@ -829,6 +907,11 @@ def next_actions(conn, incident_id: str) -> list[dict]:
     def add(title, detail, permission, urgent=False, role=None):
         out.append({"title": title, "detail": detail, "permission": permission, "role": role, "urgent": urgent})
 
+    now = utcnow().isoformat(timespec="seconds")
+    for h in pending_auto_holds(conn, incident_id):
+        overdue = h["review_by"] <= now
+        add("Confirm or lift the automatic pause" + (" — OVERDUE, escalated to Incident Lead" if overdue else ""),
+            f"C7 paused {h['target']}. It stays paused until a person decides.", "review_auto_hold", urgent=True)
     if st == "NEW":
         add("Run the AI assessment", "Or record a severity decision manually.", "run_assessment")
     if st in ("NEW", "ASSESSED", "ASSESSMENT_FAILED", "REOPENED"):
@@ -841,8 +924,8 @@ def next_actions(conn, incident_id: str) -> list[dict]:
     for p in rows(conn, "SELECT * FROM containment_actions WHERE incident_id=? AND status='proposed'", (incident_id,)):
         add("Decide on proposed containment", f"{p['action_type'].replace('_', ' ')} on {p['target']}",
             containment_permission(conn, inc), urgent=True)
-    now = utcnow().isoformat(timespec="seconds")
-    for p in rows(conn, "SELECT * FROM containment_actions WHERE incident_id=? AND status='active' AND review_by<=?", (incident_id, now)):
+    for p in rows(conn, "SELECT * FROM containment_actions WHERE incident_id=? AND status='active' AND review_by<=?"
+                        " AND NOT (proposed_source='auto_hold' AND hold_review_outcome IS NULL)", (incident_id, now)):
         add("Review temporary containment", f"{p['action_type'].replace('_', ' ')} passed its review time", "end_containment", urgent=True)
     for c in latest_communications(conn, incident_id):
         spec = json.loads(c["specialist_review_json"])

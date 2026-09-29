@@ -21,6 +21,8 @@ DATA_DIR = ROOT / "data"
 EVAL_DIR = DATA_DIR / "eval"
 DEMO_DIR = DATA_DIR / "demo"
 RESULTS_DIR = ROOT / "evaluation" / "results"
+# Rules-only baseline every candidate rule set is compared against (regression gate, alerts).
+BASELINE_RULE_VERSION = "rules-v2.0"
 
 
 def _load_dotenv() -> None:

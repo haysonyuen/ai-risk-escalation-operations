@@ -11,12 +11,14 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import dedup, workflow as wf
+from . import config, dedup, workflow as wf
 from .config import DEMO_DIR, RESULTS_DIR, db_path
 from .db import clock, connect, set_setting
 from .providers import FaultInjectionProvider, OfflineProvider
 from .schemas import IncidentIntake
 
+# Bump when seeded data or the schema changes incompatibly; older local databases are rebuilt.
+DEMO_DATA_VERSION = "demo-v2-taxonomy-v2"
 A = {a.actor_id: a for a in wf.SIMULATED_ACTORS}
 SYS = wf.SYSTEM_ACTOR
 S = "seed"
@@ -35,9 +37,10 @@ def seed(path: str | None = None, now: datetime | None = None) -> Path:
             os.remove(f)
     conn = connect(p)
     now = now or datetime.now(timezone.utc)
-    set_setting(conn, "active_rule_version", "rules-v1.0")
-    set_setting(conn, "active_prompt_version", "prompt-v1")
+    set_setting(conn, "active_rule_version", config.BASELINE_RULE_VERSION)
+    set_setting(conn, "active_prompt_version", "prompt-v3")
     set_setting(conn, "provider_mode", "offline")
+    set_setting(conn, "demo_data_version", DEMO_DATA_VERSION)
     conn.commit()
 
     spec = json.loads((DEMO_DIR / "seed_incidents.json").read_text())["incidents"]

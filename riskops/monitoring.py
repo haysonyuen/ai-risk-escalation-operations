@@ -43,6 +43,11 @@ def queue(conn, now: datetime | None = None) -> list[dict]:
         overdue = bool(deadline and not reviewed and now > deadline and inc["status"] in OPEN)
         breached = bool(deadline and reviewed and reviewed > deadline)
         pending = []
+        holds = rows(conn, "SELECT review_by FROM containment_actions WHERE incident_id=? AND proposed_source='auto_hold'"
+                           " AND status='active' AND hold_review_outcome IS NULL", (inc["incident_id"],))
+        hold_overdue = any(_dt(h["review_by"]) <= now for h in holds)
+        if holds:
+            pending.append("auto-pause review")
         if not inc["human_severity"] and inc["status"] in OPEN:
             pending.append("severity decision")
         if rows(conn, "SELECT 1 FROM containment_actions WHERE incident_id=? AND status='proposed'", (inc["incident_id"],)):
@@ -54,7 +59,10 @@ def queue(conn, now: datetime | None = None) -> list[dict]:
             pending.append("link review")
         if inc["status"] == "RESPONSE":
             pending.append("closure sign-off")
-        categories = (a["output"]["risk_categories"] if a and a["output"] else (a["rule_result"]["categories"] if a else []))
+        categories = list(a["rule_result"]["categories"]) if a else []
+        if a and a["output"]:
+            categories = list(a["output"]["risk_categories"]) + [c for c in categories if c not in a["output"]["risk_categories"]]
+        categories = [c for c in categories if c != "benign_noise"] or categories
         out.append({
             "incident_id": inc["incident_id"], "title": inc["title"], "status": inc["status"], "owner": inc["owner"] or "",
             "product_surface": intake.get("product_surface"), "customer_type": intake.get("customer_type"),
@@ -70,10 +78,11 @@ def queue(conn, now: datetime | None = None) -> list[dict]:
             "reported_at": inc["reported_at"], "age_hours": round((now - reported).total_seconds() / 3600, 1),
             "review_deadline": deadline.isoformat(timespec="minutes") if deadline else None,
             "overdue": overdue, "first_review_breached": breached,
+            "auto_paused": bool(holds), "auto_pause_overdue": hold_overdue,
             "pending": pending, "origin": inc["origin"],
             "next_actions": next_actions(conn, inc["incident_id"]),
             "minutes_to_deadline": round((deadline - now).total_seconds() / 60) if deadline and not reviewed else None,
-            "urgency": (0 if overdue else 1, {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[sev],
+            "urgency": (0 if (overdue or holds) else 1, {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[sev],
                         (deadline - now).total_seconds() if deadline and not reviewed else 1e12),
         })
     return out
@@ -123,6 +132,20 @@ def ops_metrics(conn, now: datetime | None = None) -> dict:
                 sla["containment_evaluated"] += 1
                 sla["containment_breaches"] += int(m > t)
 
+    hold_rows = rows(conn, "SELECT * FROM containment_actions WHERE proposed_source='auto_hold'")
+    reviewed = [h for h in hold_rows if h["hold_review_outcome"]]
+    lifted = [h for h in reviewed if h["hold_review_outcome"] == "lifted"]
+    hold_minutes = [_minutes(_dt(h["proposed_at"]), _dt(h["hold_reviewed_at"])) for h in reviewed]
+    auto_hold = {
+        "applied": len(hold_rows), "awaiting_review": len(hold_rows) - len(reviewed),
+        "awaiting_review_overdue": sum(1 for h in hold_rows if not h["hold_review_outcome"] and _dt(h["review_by"]) <= now),
+        "confirmed": len(reviewed) - len(lifted), "lifted": len(lifted),
+        "lifted_share_of_reviewed": {"value": len(lifted) / len(reviewed) if reviewed else None,
+                                     "numerator": len(lifted), "denominator": len(reviewed)},
+        "time_to_human_review": _stats([m for m in hold_minutes if m is not None]),
+        "note": "Lifted share is a false-alarm proxy: how often a person judged the automatic pause unnecessary.",
+    }
+
     decisions = rows(conn, "SELECT * FROM events WHERE event_type IN ('human_severity_confirmed','human_override')")
     with_ai = [d for d in decisions if (json.loads(d["details_json"] or "{}").get("ai_recommendation") or {}).get("severity")]
     overrides = [d for d in with_ai if d["event_type"] == "human_override"]
@@ -152,6 +175,7 @@ def ops_metrics(conn, now: datetime | None = None) -> dict:
         "time_to_first_human_review": {k: _stats(v) for k, v in first_review.items()},
         "time_to_recorded_simulated_containment": {k: _stats(v) for k, v in containment_time.items()},
         "sla": sla,
+        "auto_hold": auto_hold,
         "overrides": {"decisions_with_ai_recommendation": len(with_ai), "overrides": len(overrides),
                       "override_rate": (len(overrides) / len(with_ai)) if with_ai else None,
                       "by_reason": dict(reasons), "by_direction": dict(directions)},

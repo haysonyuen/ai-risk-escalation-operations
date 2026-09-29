@@ -1,0 +1,1384 @@
+{
+  "rule_version": "rules-v2.0",
+  "status": "baseline",
+  "created": "2026-09-29",
+  "taxonomy_version": "taxonomy-v2",
+  "description": "Rules-only baseline for taxonomy v2 (frontier-lab harm areas). Written from the framework's severity table plus lessons carried over from the archived v1 experiment (refusals are working safeguards; narrow 'assistant provided' phrases; low confidence must not lower severity; P3 without a specialist category goes to Support). Written BEFORE the v2 evaluation dataset existed and before any v2 evaluation was run. Keyword lexicons plus structured intake fields; first matching severity rule wins.",
+  "default_severity": "P3",
+  "default_route": "support",
+  "lexicons": {
+    "cbrn_topic": [
+      "pathogen",
+      "select agent",
+      "bioweapon",
+      "biological weapon",
+      "biological agent",
+      "toxin",
+      "nerve agent",
+      "chemical weapon",
+      "chemical agent",
+      "radiological",
+      "dirty bomb",
+      "nuclear material",
+      "fissile",
+      "uranium enrichment",
+      "explosive device",
+      "improvised explosive",
+      "high explosive",
+      "weaponization",
+      "weaponize",
+      "aerosolization",
+      "transmissibility",
+      "gain-of-function",
+      "viral culture",
+      "viral cultures",
+      "live culture",
+      "live cultures",
+      "precursor chemical",
+      "precursor chemicals",
+      "restricted chemical",
+      "dangerous biological"
+    ],
+    "cyber_topic": [
+      "malware",
+      "ransomware",
+      "infostealer",
+      "keylogger",
+      "botnet",
+      "command-and-control",
+      "exploit code",
+      "working exploit",
+      "zero-day",
+      "credential harvesting",
+      "credential-harvesting",
+      "phishing kit",
+      "reverse shell",
+      "privilege escalation",
+      "disable endpoint protection",
+      "disables endpoint protection",
+      "evade antivirus",
+      "evades antivirus"
+    ],
+    "minor_mention": [
+      "minor",
+      "minors",
+      "underage",
+      "under 18",
+      "child",
+      "children",
+      "a child",
+      "teen",
+      "teenager",
+      "year-old",
+      "school-age",
+      "middle school",
+      "high school student"
+    ],
+    "sexual_content": [
+      "sexual",
+      "sexualized",
+      "sexualised",
+      "sexually explicit",
+      "explicit content",
+      "erotic",
+      "nude",
+      "nudity",
+      "intimate",
+      "romantic role-play",
+      "sexual role-play"
+    ],
+    "child_abuse_explicit": [
+      "csam",
+      "child sexual abuse",
+      "grooming",
+      "sextortion",
+      "child exploitation"
+    ],
+    "self_harm_topic": [
+      "suicide",
+      "suicidal",
+      "self-harm",
+      "self harm",
+      "kill myself",
+      "end my life",
+      "lethal dose",
+      "overdose",
+      "hurt myself"
+    ],
+    "extremism_topic": [
+      "extremist",
+      "terrorist",
+      "terror attack",
+      "violent manifesto",
+      "mass shooting",
+      "mass-casualty",
+      "attack plan",
+      "attack planning",
+      "recruitment propaganda",
+      "radicalization",
+      "radicalisation",
+      "bomb threat",
+      "threat to kill"
+    ],
+    "deepfake_topic": [
+      "deepfake",
+      "face swap",
+      "face-swap",
+      "voice clone",
+      "cloned voice",
+      "non-consensual",
+      "nonconsensual",
+      "intimate image",
+      "undress",
+      "nudify",
+      "fabricated photo",
+      "synthetic video",
+      "synthetic audio"
+    ],
+    "real_person": [
+      "real person",
+      "coworker",
+      "co-worker",
+      "colleague",
+      "classmate",
+      "public figure",
+      "politician",
+      "named individual",
+      "ex-partner",
+      "celebrity",
+      "real individual"
+    ],
+    "influence_ops": [
+      "coordinated inauthentic",
+      "inauthentic",
+      "election",
+      "voters",
+      "ballot",
+      "disinformation",
+      "propaganda",
+      "sockpuppet",
+      "sock puppet",
+      "fake accounts",
+      "fake personas",
+      "bot network",
+      "astroturf",
+      "state-linked"
+    ],
+    "fraud_topic": [
+      "phishing email",
+      "phishing emails",
+      "scam",
+      "scams",
+      "fake invoice",
+      "romance scam",
+      "money mule",
+      "gift cards",
+      "impersonate a bank",
+      "impersonating a bank",
+      "spoofed",
+      "fraudulent"
+    ],
+    "jailbreak_topic": [
+      "jailbreak",
+      "universal jailbreak",
+      "bypassed safeguards",
+      "bypass the safeguards",
+      "bypass safeguards",
+      "safety bypass",
+      "bug bounty",
+      "adversarial suffix",
+      "many-shot"
+    ],
+    "assistant_provided": [
+      "provided steps",
+      "provided a",
+      "provided the",
+      "provided instructions",
+      "provided code",
+      "offered to",
+      "listed",
+      "gave steps",
+      "gave a list",
+      "gave instructions",
+      "generated",
+      "supplied",
+      "walked the user through",
+      "produced",
+      "drafted",
+      "wrote a",
+      "wrote working",
+      "complied",
+      "continued the"
+    ],
+    "assistant_refused": [
+      "refused",
+      "declined",
+      "did not provide",
+      "would not",
+      "safety message",
+      "redirected",
+      "crisis resources",
+      "blocked the"
+    ],
+    "external_exposure": [
+      "sent to an external",
+      "external recipient",
+      "emailed",
+      "shared publicly",
+      "public link",
+      "uploaded to",
+      "posted to",
+      "outside the organization",
+      "external domain",
+      "exfiltrated",
+      "exfiltration"
+    ],
+    "cross_tenant": [
+      "another customer",
+      "another customer's",
+      "another tenant",
+      "other tenant",
+      "cross-tenant",
+      "different organization's",
+      "another organization's",
+      "another company's",
+      "someone else's",
+      "another user's"
+    ],
+    "enterprise_data": [
+      "connector",
+      "shared drive",
+      "retrieval",
+      "search index",
+      "memory feature",
+      "internal documents",
+      "confidential",
+      "customer data",
+      "source code",
+      "workspace data"
+    ],
+    "pii_topic": [
+      "home address",
+      "phone number",
+      "social security",
+      "passport number",
+      "medical record",
+      "medical records",
+      "personal data",
+      "date of birth",
+      "email addresses"
+    ],
+    "injection_influence": [
+      "hidden instruction",
+      "hidden instructions",
+      "embedded instruction",
+      "embedded instructions",
+      "instructions hidden",
+      "text on the page instructed",
+      "the document contained instructions",
+      "instructions in the email",
+      "injected",
+      "prompt injection",
+      "white text",
+      "poisoned",
+      "malicious tool description"
+    ],
+    "secret_leak": [
+      "api key",
+      "api keys",
+      "access token",
+      "access tokens",
+      "secret key",
+      "private key",
+      "system prompt",
+      "password",
+      "passwords",
+      "credentials",
+      "model weights"
+    ],
+    "agentic_action": [
+      "deleted",
+      "force-pushed",
+      "force pushed",
+      "ran the command",
+      "executed",
+      "purchased",
+      "booked",
+      "transferred",
+      "merged",
+      "dropped the table",
+      "sent without"
+    ],
+    "inaccurate": [
+      "incorrect",
+      "inaccurate",
+      "hallucinated",
+      "hallucination",
+      "fabricated citation",
+      "fabricated citations",
+      "made-up",
+      "made up",
+      "wrong dose",
+      "wrong dosage",
+      "nonexistent",
+      "false statement",
+      "invented"
+    ],
+    "high_stakes_domain": [
+      "dosage",
+      "dose",
+      "medication",
+      "medical",
+      "diagnosis",
+      "insulin",
+      "legal advice",
+      "court filing",
+      "tax filing",
+      "financial advice",
+      "drug interaction"
+    ],
+    "bias_topic": [
+      "biased",
+      "bias",
+      "discriminatory",
+      "discrimination",
+      "stereotype",
+      "stereotypes",
+      "ranked lower",
+      "protected characteristic",
+      "gender",
+      "ethnicity",
+      "disability"
+    ],
+    "appeal": [
+      "appeal",
+      "over-refusal",
+      "overly cautious",
+      "refused a legitimate",
+      "false positive",
+      "wrongly suspended",
+      "account was suspended",
+      "reinstate",
+      "access was restricted",
+      "was restricted"
+    ],
+    "product_failure": [
+      "crash",
+      "crashes",
+      "crashed",
+      "timeout",
+      "timed out",
+      "failed to load",
+      "error message",
+      "broken",
+      "stopped working",
+      "outage",
+      "latency"
+    ],
+    "benign": [
+      "feature request",
+      "how do i",
+      "question about",
+      "working as designed",
+      "working as expected",
+      "test report",
+      "no issue",
+      "suggestion",
+      "is it allowed",
+      "homework"
+    ],
+    "contradiction": [
+      "no record",
+      "does not show",
+      "do not show",
+      "logs show no",
+      "contradict",
+      "contradicts",
+      "inconsistent with",
+      "not present in the log",
+      "no matching"
+    ],
+    "exposure_claim": [
+      "sent our data",
+      "leaked",
+      "exposed our",
+      "shared our data",
+      "our data was sent",
+      "data breach",
+      "saw another company",
+      "saw someone else's"
+    ]
+  },
+  "derived_signals": {
+    "minor_and_sexual": {
+      "all": [
+        "minor_mention",
+        "sexual_content"
+      ]
+    },
+    "child_sexual": {
+      "any": [
+        "child_abuse_explicit",
+        "minor_and_sexual"
+      ]
+    },
+    "provided_not_refused": {
+      "all": [
+        "assistant_provided"
+      ],
+      "none": [
+        "assistant_refused"
+      ]
+    },
+    "refused_not_provided": {
+      "all": [
+        "assistant_refused"
+      ],
+      "none": [
+        "assistant_provided"
+      ]
+    },
+    "severe_topic": {
+      "any": [
+        "cbrn_topic",
+        "child_sexual",
+        "self_harm_topic",
+        "extremism_topic"
+      ]
+    }
+  },
+  "corroboration_signals": [
+    "cbrn_topic",
+    "cyber_topic",
+    "child_sexual",
+    "self_harm_topic",
+    "extremism_topic",
+    "deepfake_topic",
+    "influence_ops",
+    "fraud_topic",
+    "jailbreak_topic",
+    "external_exposure",
+    "cross_tenant",
+    "injection_influence",
+    "secret_leak",
+    "inaccurate",
+    "bias_topic",
+    "appeal",
+    "product_failure"
+  ],
+  "severity_rules": [
+    {
+      "id": "SEV-P0-CBRN",
+      "severity": "P0",
+      "description": "CBRN weapons topic where the assistant provided or offered assistance and did not refuse (actionable uplift).",
+      "all": [
+        "cbrn_topic",
+        "provided_not_refused"
+      ]
+    },
+    {
+      "id": "SEV-P0-CHILD",
+      "severity": "P0",
+      "description": "Sexual content involving a minor that the assistant produced or continued (never acceptable; mandatory reporting may apply).",
+      "all": [
+        "child_sexual",
+        "provided_not_refused"
+      ]
+    },
+    {
+      "id": "SEV-P0-XTENANT",
+      "severity": "P0",
+      "description": "Another customer's / tenant's data exposed, with sensitive data confirmed.",
+      "all": [
+        "cross_tenant",
+        "sensitive_yes"
+      ]
+    },
+    {
+      "id": "SEV-P0-EXFIL",
+      "severity": "P0",
+      "description": "Untrusted instructions caused an external action that sent sensitive data or secrets out.",
+      "all": [
+        "injection_influence",
+        "external_yes"
+      ],
+      "any": [
+        "sensitive_yes",
+        "secret_leak"
+      ]
+    },
+    {
+      "id": "SEV-P0-EXT",
+      "severity": "P0",
+      "description": "Sensitive data confirmed, external action attempted and external exposure language present.",
+      "all": [
+        "sensitive_yes",
+        "external_yes",
+        "external_exposure"
+      ]
+    },
+    {
+      "id": "SEV-P3-REFUSED",
+      "severity": "P3",
+      "description": "Severe-harm or cyber topic where the assistant refused and provided nothing: the safeguard worked (still routed to the specialist queue for sampling).",
+      "all": [
+        "refused_not_provided"
+      ],
+      "any": [
+        "cbrn_topic",
+        "cyber_topic",
+        "extremism_topic"
+      ],
+      "none": [
+        "child_sexual",
+        "self_harm_topic"
+      ]
+    },
+    {
+      "id": "SEV-P1-CHILD",
+      "severity": "P1",
+      "description": "Any other report involving sexual content and a minor (attempted solicitation, unclear output).",
+      "any": [
+        "child_sexual"
+      ]
+    },
+    {
+      "id": "SEV-P1-CBRN",
+      "severity": "P1",
+      "description": "Any other CBRN weapons report.",
+      "any": [
+        "cbrn_topic"
+      ]
+    },
+    {
+      "id": "SEV-P1-CYBER",
+      "severity": "P1",
+      "description": "Cyber-offense tooling the assistant provided.",
+      "all": [
+        "cyber_topic",
+        "provided_not_refused"
+      ]
+    },
+    {
+      "id": "SEV-P1-SELFHARM",
+      "severity": "P1",
+      "description": "Self-harm or suicide content the assistant provided to a user (method or encouragement), not a supportive redirect.",
+      "all": [
+        "self_harm_topic",
+        "provided_not_refused"
+      ]
+    },
+    {
+      "id": "SEV-P1-EXTREMISM",
+      "severity": "P1",
+      "description": "Violent-extremist content or attack planning the assistant produced.",
+      "all": [
+        "extremism_topic",
+        "provided_not_refused"
+      ]
+    },
+    {
+      "id": "SEV-P1-DEEPFAKE",
+      "severity": "P1",
+      "description": "Deepfake or intimate imagery of a real person.",
+      "all": [
+        "deepfake_topic",
+        "real_person"
+      ]
+    },
+    {
+      "id": "SEV-P1-INFLUENCE",
+      "severity": "P1",
+      "description": "Coordinated influence activity across accounts or repeated.",
+      "all": [
+        "influence_ops"
+      ],
+      "any": [
+        "multi_scope",
+        "repeated"
+      ]
+    },
+    {
+      "id": "SEV-P1-FRAUD",
+      "severity": "P1",
+      "description": "Fraud or scam content generated at scale (multiple accounts or repeated).",
+      "all": [
+        "fraud_topic",
+        "provided_not_refused"
+      ],
+      "any": [
+        "multi_scope",
+        "repeated"
+      ]
+    },
+    {
+      "id": "SEV-P1-JAILBREAK",
+      "severity": "P1",
+      "description": "A safeguard bypass that produced disallowed output.",
+      "all": [
+        "jailbreak_topic",
+        "provided_not_refused"
+      ]
+    },
+    {
+      "id": "SEV-P1-SECRETS",
+      "severity": "P1",
+      "description": "Secrets, credentials or the system prompt exposed.",
+      "any": [
+        "secret_leak"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "id": "SEV-P1-SENSITIVE",
+      "severity": "P1",
+      "description": "Sensitive data possible or confirmed for an enterprise customer or with an external action.",
+      "all": [
+        "sensitive_any"
+      ],
+      "any": [
+        "enterprise",
+        "external_yes"
+      ]
+    },
+    {
+      "id": "SEV-P1-INJECTION",
+      "severity": "P1",
+      "description": "Untrusted-instruction influence together with an external action or file modification.",
+      "all": [
+        "injection_influence"
+      ],
+      "any": [
+        "external_yes",
+        "file_modified"
+      ]
+    },
+    {
+      "id": "SEV-P1-UNAPPROVED",
+      "severity": "P1",
+      "description": "Agent action taken without user approval that was external or deleted data.",
+      "all": [
+        "approved_no"
+      ],
+      "any": [
+        "external_yes",
+        "file_deleted"
+      ]
+    },
+    {
+      "id": "SEV-P2-SELFHARM",
+      "severity": "P2",
+      "description": "Self-harm topic where the assistant's handling needs review (no method provided).",
+      "any": [
+        "self_harm_topic"
+      ]
+    },
+    {
+      "id": "SEV-P2-HARMS",
+      "severity": "P2",
+      "description": "Other misuse report (cyber, extremism, fraud, jailbreak, deepfake, influence) not meeting P1.",
+      "any": [
+        "cyber_topic",
+        "extremism_topic",
+        "fraud_topic",
+        "jailbreak_topic",
+        "deepfake_topic",
+        "influence_ops"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "id": "SEV-P2-INACCURATE",
+      "severity": "P2",
+      "description": "Inaccurate output in a high-stakes domain (medical, legal, financial) or reported by an enterprise.",
+      "all": [
+        "inaccurate"
+      ],
+      "any": [
+        "high_stakes_domain",
+        "enterprise",
+        "repeated"
+      ]
+    },
+    {
+      "id": "SEV-P2-BIAS",
+      "severity": "P2",
+      "description": "Biased or discriminatory output reported.",
+      "any": [
+        "bias_topic"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "id": "SEV-P2-AGENT",
+      "severity": "P2",
+      "description": "Agent changed or deleted data with a material signal (stated impact, repeated, multi-user, irreversible or enterprise).",
+      "all": [
+        "file_modified"
+      ],
+      "any": [
+        "impact_stated",
+        "repeated",
+        "multi_scope",
+        "irreversible",
+        "enterprise"
+      ]
+    },
+    {
+      "id": "SEV-P2-APPEAL",
+      "severity": "P2",
+      "description": "Enforcement appeal or over-refusal by an enterprise or repeated: expedited human review.",
+      "all": [
+        "appeal"
+      ],
+      "any": [
+        "enterprise",
+        "repeated",
+        "multi_scope"
+      ]
+    },
+    {
+      "id": "SEV-P2-FAILURE",
+      "severity": "P2",
+      "description": "Recurring or multi-user product failure.",
+      "all": [
+        "product_failure"
+      ],
+      "any": [
+        "repeated",
+        "multi_scope"
+      ]
+    }
+  ],
+  "severity_floors": [
+    {
+      "id": "FLOOR-01",
+      "floor": "P1",
+      "description": "Potential impact high/critical but evidence weak or missing: at least P1 until evidence is reviewed (low confidence must not lower severity).",
+      "all": [
+        "impact_high_or_critical",
+        "evidence_weak_or_none"
+      ]
+    }
+  ],
+  "impact_rules": [
+    {
+      "level": "critical",
+      "any": [
+        "cbrn_topic",
+        "child_sexual"
+      ],
+      "none": [
+        "refused_not_provided"
+      ]
+    },
+    {
+      "level": "critical",
+      "all": [
+        "cross_tenant",
+        "sensitive_any"
+      ]
+    },
+    {
+      "level": "high",
+      "any": [
+        "self_harm_topic",
+        "extremism_topic",
+        "secret_leak",
+        "injection_influence",
+        "cross_tenant",
+        "exposure_claim"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "level": "high",
+      "all": [
+        "cyber_topic",
+        "provided_not_refused"
+      ]
+    },
+    {
+      "level": "high",
+      "all": [
+        "sensitive_any"
+      ],
+      "any": [
+        "external_yes",
+        "enterprise"
+      ]
+    },
+    {
+      "level": "high",
+      "all": [
+        "deepfake_topic",
+        "real_person"
+      ]
+    },
+    {
+      "level": "high",
+      "all": [
+        "influence_ops"
+      ],
+      "any": [
+        "multi_scope",
+        "repeated"
+      ]
+    },
+    {
+      "level": "high",
+      "all": [
+        "approved_no"
+      ],
+      "any": [
+        "external_yes",
+        "file_deleted"
+      ]
+    },
+    {
+      "level": "moderate",
+      "any": [
+        "file_modified",
+        "repeated",
+        "multi_scope",
+        "cyber_topic",
+        "fraud_topic",
+        "jailbreak_topic",
+        "deepfake_topic",
+        "influence_ops",
+        "bias_topic",
+        "appeal",
+        "high_stakes_domain"
+      ]
+    }
+  ],
+  "category_rules": [
+    {
+      "category": "cbrn",
+      "any": [
+        "cbrn_topic"
+      ]
+    },
+    {
+      "category": "child_safety",
+      "any": [
+        "child_sexual"
+      ]
+    },
+    {
+      "category": "cyber_misuse",
+      "any": [
+        "cyber_topic"
+      ]
+    },
+    {
+      "category": "self_harm",
+      "any": [
+        "self_harm_topic"
+      ]
+    },
+    {
+      "category": "violent_extremism",
+      "any": [
+        "extremism_topic"
+      ]
+    },
+    {
+      "category": "deepfake_ncii",
+      "any": [
+        "deepfake_topic"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "category": "influence_operations",
+      "any": [
+        "influence_ops"
+      ]
+    },
+    {
+      "category": "fraud_scams",
+      "any": [
+        "fraud_topic"
+      ]
+    },
+    {
+      "category": "safeguard_bypass",
+      "any": [
+        "jailbreak_topic"
+      ]
+    },
+    {
+      "category": "enterprise_data_leakage",
+      "any": [
+        "cross_tenant"
+      ]
+    },
+    {
+      "category": "enterprise_data_leakage",
+      "all": [
+        "enterprise",
+        "sensitive_any"
+      ]
+    },
+    {
+      "category": "privacy_pii",
+      "any": [
+        "pii_topic"
+      ]
+    },
+    {
+      "category": "privacy_pii",
+      "all": [
+        "sensitive_any"
+      ],
+      "none": [
+        "enterprise"
+      ]
+    },
+    {
+      "category": "prompt_injection",
+      "any": [
+        "injection_influence"
+      ]
+    },
+    {
+      "category": "model_security",
+      "any": [
+        "secret_leak"
+      ]
+    },
+    {
+      "category": "agentic_overreach",
+      "all": [
+        "approved_no"
+      ],
+      "any": [
+        "external_yes",
+        "file_modified",
+        "agentic_action"
+      ]
+    },
+    {
+      "category": "agentic_overreach",
+      "all": [
+        "file_modified"
+      ],
+      "none": [
+        "benign"
+      ]
+    },
+    {
+      "category": "harmful_inaccuracy",
+      "any": [
+        "inaccurate"
+      ]
+    },
+    {
+      "category": "bias_discrimination",
+      "any": [
+        "bias_topic"
+      ]
+    },
+    {
+      "category": "enforcement_appeal",
+      "any": [
+        "appeal"
+      ]
+    },
+    {
+      "category": "product_failure",
+      "any": [
+        "product_failure"
+      ]
+    }
+  ],
+  "route_priority": [
+    [
+      "child_safety",
+      "child_safety"
+    ],
+    [
+      "cbrn",
+      "safety"
+    ],
+    [
+      "self_harm",
+      "safety"
+    ],
+    [
+      "violent_extremism",
+      "safety"
+    ],
+    [
+      "influence_operations",
+      "threat_intel"
+    ],
+    [
+      "fraud_scams",
+      "threat_intel"
+    ],
+    [
+      "cyber_misuse",
+      "safety"
+    ],
+    [
+      "deepfake_ncii",
+      "safety"
+    ],
+    [
+      "safeguard_bypass",
+      "safety"
+    ],
+    [
+      "enterprise_data_leakage",
+      "legal_privacy"
+    ],
+    [
+      "privacy_pii",
+      "legal_privacy"
+    ],
+    [
+      "prompt_injection",
+      "product_security"
+    ],
+    [
+      "model_security",
+      "product_security"
+    ],
+    [
+      "enforcement_appeal",
+      "risk_ops"
+    ],
+    [
+      "agentic_overreach",
+      "product_engineering"
+    ],
+    [
+      "harmful_inaccuracy",
+      "model_behavior"
+    ],
+    [
+      "bias_discrimination",
+      "model_behavior"
+    ],
+    [
+      "product_failure",
+      "product_engineering"
+    ],
+    [
+      "benign_noise",
+      "support"
+    ]
+  ],
+  "p3_routing": {
+    "id": "ROUTE-P3",
+    "route": "support",
+    "description": "P3 without a specialist category routes to Support (support education, trend monitoring, QA sampling).",
+    "keep_route_for_categories": [
+      "cbrn",
+      "child_safety",
+      "cyber_misuse",
+      "self_harm",
+      "violent_extremism",
+      "deepfake_ncii",
+      "influence_operations",
+      "fraud_scams",
+      "safeguard_bypass",
+      "enterprise_data_leakage",
+      "privacy_pii",
+      "prompt_injection",
+      "model_security",
+      "enforcement_appeal"
+    ]
+  },
+  "teams": {
+    "cbrn": [
+      "Safety",
+      "Legal/Privacy",
+      "Risk Ops"
+    ],
+    "child_safety": [
+      "Child Safety",
+      "Legal/Privacy",
+      "Safety"
+    ],
+    "cyber_misuse": [
+      "Safety",
+      "Threat Intel",
+      "Product Security"
+    ],
+    "self_harm": [
+      "Safety",
+      "Support"
+    ],
+    "violent_extremism": [
+      "Safety",
+      "Threat Intel",
+      "Legal/Privacy"
+    ],
+    "deepfake_ncii": [
+      "Safety",
+      "Legal/Privacy",
+      "Support"
+    ],
+    "influence_operations": [
+      "Threat Intel",
+      "Safety",
+      "Legal/Privacy"
+    ],
+    "fraud_scams": [
+      "Threat Intel",
+      "Safety",
+      "Support"
+    ],
+    "safeguard_bypass": [
+      "Safety",
+      "Model Behavior",
+      "Product Security"
+    ],
+    "enterprise_data_leakage": [
+      "Legal/Privacy",
+      "Enterprise/CS",
+      "Product Security",
+      "Engineering"
+    ],
+    "privacy_pii": [
+      "Legal/Privacy",
+      "Risk Ops",
+      "Engineering"
+    ],
+    "prompt_injection": [
+      "Product Security",
+      "Engineering",
+      "Safety"
+    ],
+    "model_security": [
+      "Product Security",
+      "Engineering",
+      "Legal/Privacy"
+    ],
+    "agentic_overreach": [
+      "Engineering",
+      "Product/UX",
+      "Support"
+    ],
+    "harmful_inaccuracy": [
+      "Model Behavior",
+      "Safety",
+      "Support"
+    ],
+    "bias_discrimination": [
+      "Model Behavior",
+      "Legal/Privacy",
+      "Enterprise/CS"
+    ],
+    "enforcement_appeal": [
+      "Risk Ops",
+      "Support",
+      "Enterprise/CS"
+    ],
+    "product_failure": [
+      "Engineering",
+      "Support"
+    ],
+    "benign_noise": [
+      "Support"
+    ]
+  },
+  "mandatory_review": [
+    {
+      "id": "REV-01",
+      "description": "P0/P1 recommendation: a human must confirm severity and review source evidence.",
+      "any": [
+        "sev_P0",
+        "sev_P1"
+      ]
+    },
+    {
+      "id": "REV-02",
+      "description": "Sensitive data possibly involved: Legal/Privacy-aware review required.",
+      "any": [
+        "sensitive_any"
+      ]
+    },
+    {
+      "id": "REV-03",
+      "description": "Severe-harm topic (CBRN, child safety, self-harm, violent extremism) mentioned: a specialist must look even if severity seems low.",
+      "any": [
+        "severe_topic"
+      ]
+    },
+    {
+      "id": "REV-04",
+      "description": "Four or more key intake fields unknown: human triage needed before routing is relied on.",
+      "any": [
+        "many_unknowns"
+      ]
+    },
+    {
+      "id": "REV-05",
+      "description": "A severity floor was applied: confirm or correct with evidence.",
+      "any": [
+        "floor_applied"
+      ]
+    }
+  ],
+  "containment_options": {
+    "cbrn": [
+      {
+        "action_type": "pause_interaction",
+        "target": "the reported conversation/session",
+        "rationale": "Stop further potential uplift while Safety reviews.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      },
+      {
+        "action_type": "deploy_classifier_block",
+        "target": "the request pattern seen in this case",
+        "rationale": "Block close variants of the request while the gap is fixed.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "child_safety": [
+      {
+        "action_type": "pause_interaction",
+        "target": "the reported conversation/session",
+        "rationale": "Stop the interaction immediately while Child Safety reviews.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      },
+      {
+        "action_type": "deploy_classifier_block",
+        "target": "the role-play / prompt pattern seen in this case",
+        "rationale": "Block close variants while the safeguard gap is fixed.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "cyber_misuse": [
+      {
+        "action_type": "deploy_classifier_block",
+        "target": "the tooling request pattern seen in this case",
+        "rationale": "Block close variants while Safety and Threat Intel review.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "violent_extremism": [
+      {
+        "action_type": "pause_interaction",
+        "target": "the reported conversation/session",
+        "rationale": "Stop further output while Safety reviews for credible threat.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "deepfake_ncii": [
+      {
+        "action_type": "restrict_tool_action",
+        "target": "image/voice generation of the reported person's likeness",
+        "rationale": "Prevent further images of this person while reviewed.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "influence_operations": [
+      {
+        "action_type": "rate_limit_accounts",
+        "target": "the linked account cluster",
+        "rationale": "Slow the campaign while Threat Intel confirms coordination.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "fraud_scams": [
+      {
+        "action_type": "rate_limit_accounts",
+        "target": "the linked accounts",
+        "rationale": "Slow scam generation while Threat Intel investigates.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "safeguard_bypass": [
+      {
+        "action_type": "deploy_classifier_block",
+        "target": "the reported bypass technique",
+        "rationale": "Mitigate the known technique while a model fix is prepared.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "enterprise_data_leakage": [
+      {
+        "action_type": "disable_connector",
+        "target": "the connector / retrieval index involved",
+        "rationale": "Stop further cross-boundary retrieval while scope is assessed.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      },
+      {
+        "action_type": "restrict_tool_action",
+        "target": "external send/share tool for the affected workspace",
+        "rationale": "Prevent further external transmission pending investigation.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "privacy_pii": [
+      {
+        "action_type": "warn_sensitive_file_access",
+        "target": "affected workspace",
+        "rationale": "Add friction before personal-data access while scope is assessed.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "prompt_injection": [
+      {
+        "action_type": "isolate_untrusted_instructions",
+        "target": "web/file/email content ingestion for the affected surface",
+        "rationale": "Treat instructions from untrusted content as data while Product Security investigates.",
+        "reversible": true,
+        "offer_at_or_above": "P2"
+      },
+      {
+        "action_type": "disable_connector",
+        "target": "the tool or connector that carried the injected content",
+        "rationale": "Remove the injection path while it is fixed.",
+        "reversible": true,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "model_security": [
+      {
+        "action_type": "rotate_credentials",
+        "target": "the exposed keys/tokens",
+        "rationale": "Exposed secrets must be rotated; this cannot be undone but is low-risk to users.",
+        "reversible": false,
+        "offer_at_or_above": "P1"
+      }
+    ],
+    "agentic_overreach": [
+      {
+        "action_type": "require_confirmation_destructive",
+        "target": "the affected tool action",
+        "rationale": "Require explicit confirmation before the action type can run again.",
+        "reversible": true,
+        "offer_at_or_above": "P2"
+      }
+    ]
+  }
+}

@@ -81,7 +81,7 @@ def _provider(system: str):
             raise LiveEvaluationUnavailable(
                 "Live evaluation requires ANTHROPIC_API_KEY. Nothing was run and no offline results were substituted.\n"
                 "Run later with:\n  export ANTHROPIC_API_KEY=...\n"
-                "  python -m riskops.cli eval --system live --rules rules-v1.1 --prompt prompt-v2 --split dev")
+                "  python -m riskops.cli eval --system live --rules rules-v2.1 --prompt prompt-v3 --split dev")
         return AnthropicProvider()
     if system.startswith("fault:"):
         return FaultInjectionProvider(system.split(":", 1)[1])
@@ -179,7 +179,7 @@ def score(preds: list[dict]) -> dict:
     }
 
 
-def run_eval(system: str = "rules", rule_version: str = "rules-v1.0", prompt_version: str = "prompt-v1",
+def run_eval(system: str = "rules", rule_version: str = config.BASELINE_RULE_VERSION, prompt_version: str = "prompt-v3",
              split: str = "dev", label: str | None = None, write: bool = True, out_dir: Path | None = None) -> dict:
     provider = _provider(system)
     cases = load_cases(split)

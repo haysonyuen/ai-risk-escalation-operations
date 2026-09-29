@@ -51,15 +51,24 @@ def _context(conn, incident_id: str) -> dict:
             "containment": containment, "categories": categories}
 
 
+# Categories whose external wording needs a specialist before it can be used.
+SAFETY_REVIEW_CATEGORIES = {"cbrn", "cyber_misuse", "self_harm", "violent_extremism", "deepfake_ncii", "safeguard_bypass"}
+PRIVACY_CATEGORIES = {"enterprise_data_leakage", "privacy_pii", "model_security"}
+
+
 def required_reviews(ctx: dict, comm_type: str) -> list[str]:
     i = ctx["intake"]
     req = []
-    sensitive = i.sensitive_data in ("yes", "possible") or "sensitive_data" in ctx["categories"]
+    cats = set(ctx["categories"])
+    sensitive = i.sensitive_data in ("yes", "possible") or bool(PRIVACY_CATEGORIES & cats) or "child_safety" in cats
     external = comm_type in ("user_ack", "closure_summary", "executive_brief")
     if sensitive or (external and i.customer_type == "enterprise") or (external and ctx["sev"] in ("P0", "P1")):
         req.append("Legal/Privacy")
-    if {"harmful_assistance", "synthetic_media"} & set(ctx["categories"]) and comm_type in ("user_ack", "executive_brief", "closure_summary"):
+    external_or_brief = comm_type in ("user_ack", "executive_brief", "closure_summary")
+    if SAFETY_REVIEW_CATEGORIES & cats and external_or_brief:
         req.append("Safety")
+    if "child_safety" in cats and external_or_brief:
+        req.append("Child Safety")
     return req
 
 
@@ -120,13 +129,15 @@ def render(conn, incident_id: str, comm_type: str) -> tuple[str, list[str], list
                 *([f"- {s}" for s in o.get("next_steps", [])] or ["- Review evidence and confirm ownership."]),
                 "", "Containment state:", *_actions(ctx)]
     elif comm_type == "user_ack":
-        safety = "harmful_assistance" in ctx["categories"]
+        safety = bool((SAFETY_REVIEW_CATEGORIES | {"child_safety"}) & set(ctx["categories"]))
+        self_harm = "self_harm" in ctx["categories"]
         body = [HEADER, "Subject: We received your report" + (f" ({i.incident_id})" if i.incident_id else ""), "",
                 "Hello,", "",
                 "Thank you for reporting this. We have received it and a member of our team is reviewing it.",
                 "We are looking at what the assistant did, what was shown to you, and whether anything else was affected.",
                 "Approving an action in the product does not mean you did anything wrong; we are reviewing how the action was presented.",
                 *(["For your safety we will not repeat the content of the response here. The report has been escalated for specialist review."] if safety else []),
+                *(["If you or someone you know is struggling, please reach out to a local crisis line or emergency services. [Specialist to insert region-appropriate resources.]"] if self_harm else []),
                 *(["If files were changed, you can review and restore earlier versions from version history while we investigate."] if i.file_action in ("edited", "deleted") else []),
                 "We will not speculate about the cause until we have reviewed the records. We will follow up with an update.",
                 "", "— Support team (draft)", "", f"[Internal: evidence referenced {', '.join(refs)}; no commitments about exposure, retention, deletion or legal impact are made in this draft.]"]

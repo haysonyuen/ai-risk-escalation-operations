@@ -69,7 +69,7 @@ def render() -> None:
             st.error("The active rule version is a FAULT-INJECTION demo set. Roll back.")
         st.markdown("**Regression evaluation** — run a baseline and a candidate on the same split and apply the regression gate.")
         a1, a2, a3 = st.columns(3)
-        base_v = a1.selectbox("Baseline", versions, index=versions.index("rules-v1.0") if "rules-v1.0" in versions else 0)
+        base_v = a1.selectbox("Baseline", versions, index=versions.index(config.BASELINE_RULE_VERSION) if config.BASELINE_RULE_VERSION in versions else 0)
         cand_v = a2.selectbox("Candidate", versions, index=versions.index(active))
         split = a3.selectbox("Split", ["held_out", "dev", "all"])
         if st.button("Run regression check"):
@@ -112,7 +112,7 @@ def render() -> None:
 | C6 | A different route than a specialist route (Safety, Legal/Privacy, Product Security) → specialist route kept and flagged |
 """)
         st.markdown("**Prompt versions** (used only in live mode)")
-        pv = st.selectbox("Prompt", ["prompt-v1", "prompt-v2"])
+        pv = st.selectbox("Prompt", sorted(p.stem for p in config.PROMPT_DIR.glob("prompt-v*.md")))
         st.code((config.PROMPT_DIR / f"{pv}.md").read_text()[:5000], language="markdown")
         st.markdown("**SLA targets — PROTOTYPE ASSUMPTIONS** (config/sla.json)")
         sla = config.sla_config()

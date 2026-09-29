@@ -8,13 +8,13 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import streamlit as st
 
-from common import (humanize, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
+from common import (action_label, humanize, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
                     TEAMS, actor_name, ago, badge, conn, current_actor, describe_event, esc, feedback, go, md,
                     permission_hint, pretty, provider_for_mode, relative, run_action, run_inline, section, sev_badge,
                     source_badge, stepper)
 from riskops import communications, dedup, monitoring, workflow as wf
 from riskops.db import rows
-from riskops.schemas import REVERSIBLE_CONTAINMENT, ROUTES, SEVERITIES, Evidence
+from riskops.schemas import CONTAINMENT_TYPES, ROUTES, SEVERITIES, Evidence
 
 TRANSITION_LABEL = {("TRIAGED", "INVESTIGATING"): "Start investigation", ("TRIAGED", "RESPONSE"): "Skip to response",
                     ("INVESTIGATING", "CONTAINMENT"): "Move to containment", ("INVESTIGATING", "RESPONSE"): "Move to response",
@@ -409,9 +409,33 @@ def _containment_card(inc, a) -> None:
     iid = inc["incident_id"]
     acts = rows(c, "SELECT * FROM containment_actions WHERE incident_id=? ORDER BY proposed_at", (iid,))
     pending = [x for x in acts if x["status"] == "proposed"]
-    active = [x for x in acts if x["status"] == "active"]
-    with st.expander(f"Containment — {len(pending)} pending, {len(active)} active", expanded=bool(pending or active) or inc["status"] == "CONTAINMENT"):
+    holds = [x for x in acts if x["status"] == "active" and x["proposed_source"] == "auto_hold" and not x["hold_review_outcome"]]
+    active = [x for x in acts if x["status"] == "active" and x not in holds]
+    title = f"Containment — {len(pending)} pending, {len(active) + len(holds)} active" + (" · ⏸ AUTO-PAUSED" if holds else "")
+    with st.expander(title, expanded=bool(pending or active or holds) or inc["status"] == "CONTAINMENT"):
         md(badge("SIMULATED — nothing is executed against any system", "b-sim-action"))
+        hint_hold = permission_hint("review_auto_hold")
+        for x in holds:
+            k = x["action_id"]
+            due = datetime.fromisoformat(x["review_by"])
+            overdue = due <= datetime.now(timezone.utc)
+            with st.container(border=True):
+                md(badge("⏸ AUTO-PAUSED · C7", "b-p0") + f" <b>{action_label(x['action_type'])}</b> on {esc(x['target'])}"
+                   + f"<br><span class='small'>Applied automatically {ago(x['proposed_at'])} · {esc(x['rationale'])}<br>"
+                   + ("<b>Review overdue — escalated to the Incident Lead. The pause stays on until a person decides.</b>" if overdue
+                      else f"Confirm or lift {relative((due - datetime.now(timezone.utc)).total_seconds() / 60)} · it never lifts itself")
+                   + "</span>")
+                why = st.text_input("Reason", key=f"ahr_{k}", placeholder="Reason (lifting needs 20+ characters)",
+                                    label_visibility="collapsed", disabled=bool(hint_hold))
+                b1, b2 = st.columns(2)
+                if b1.button("Confirm pause", key=f"ahk_{k}", type="primary", disabled=bool(hint_hold), help=hint_hold, use_container_width=True):
+                    run_action(lambda: wf.review_auto_hold(c, k, current_actor(), True, why), "Automatic pause confirmed", area=f"ct_{iid}")
+                    st.rerun()
+                if b2.button("Lift pause", key=f"ahl_{k}", disabled=bool(hint_hold), help=hint_hold, use_container_width=True):
+                    run_action(lambda: wf.review_auto_hold(c, k, current_actor(), False, why), "Automatic pause lifted", area=f"ct_{iid}")
+                    st.rerun()
+                if hint_hold:
+                    st.caption(hint_hold)
         perm = wf.containment_permission(c, inc)
         hint = permission_hint(perm)
         sev, basis = wf.effective_severity(c, inc)
@@ -420,7 +444,7 @@ def _containment_card(inc, a) -> None:
         for x in pending:
             with st.container(border=True):
                 who = "AI" if x["proposed_source"] == "ai" else actor_name(x["proposed_by"])
-                md(f"<b>{pretty(x['action_type'])}</b> on {esc(x['target'])}<br><span class='small'>Proposed by {esc(who)}"
+                md(f"<b>{action_label(x['action_type'])}</b> on {esc(x['target'])}<br><span class='small'>Proposed by {esc(who)}"
                    f" · {ago(x['proposed_at'])} · {esc(x['rationale'])}</span>")
                 k = x["action_id"]
                 reason = st.text_input("Decision reason", key=f"cr_{k}", placeholder="Decision reason (required)", label_visibility="collapsed", disabled=bool(hint))
@@ -440,9 +464,11 @@ def _containment_card(inc, a) -> None:
         for x in active:
             with st.container(border=True):
                 due = datetime.fromisoformat(x["review_by"])
-                md(f"<b>{pretty(x['action_type'])}</b> on {esc(x['target'])} " + badge("ACTIVE · simulated", "b-p1")
-                   + f"<br><span class='small'>Approved by {esc(actor_name(x['decided_by']))} · review {relative((due - now).total_seconds() / 60)}"
-                   f" · expires {x['expires_at'][:16].replace('T', ' ')} UTC</span>")
+                by = (f"Automatic pause (C7), confirmed by {esc(actor_name(x['hold_reviewed_by']))}" if x["proposed_source"] == "auto_hold"
+                      else f"Approved by {esc(actor_name(x['decided_by']))}")
+                exp = f"expires {x['expires_at'][:16].replace('T', ' ')} UTC" if x["expires_at"] else "no automatic expiry"
+                md(f"<b>{action_label(x['action_type'])}</b> on {esc(x['target'])} " + badge("ACTIVE · simulated", "b-p1")
+                   + f"<br><span class='small'>{by} · review {relative((due - now).total_seconds() / 60)} · {exp}</span>")
                 k = x["action_id"]
                 why = st.text_input("Reason", key=f"ce_{k}", placeholder="Reason to reverse", label_visibility="collapsed", disabled=bool(hint_end))
                 if st.button("Reverse containment", key=f"ceb_{k}", disabled=bool(hint_end), help=hint_end, use_container_width=True):
@@ -451,13 +477,14 @@ def _containment_card(inc, a) -> None:
         feedback(f"ct_{iid}")
         past = [x for x in acts if x["status"] in ("rejected", "reversed", "expired")]
         if past:
-            st.caption("History: " + " · ".join(f"{pretty(x['action_type'])} {x['status']}" for x in past))
+            st.caption("History: " + " · ".join(f"{action_label(x['action_type'])} {x['status']}"
+                                                 + (" (automatic pause lifted)" if x["hold_review_outcome"] == "lifted" else "") for x in past))
         if inc["status"] not in CLOSED:
             with st.popover("＋ Propose containment", use_container_width=True, disabled=bool(permission_hint("propose_containment"))):
                 if a and a["output"] and a["output"]["containment_options"]:
                     st.markdown("**AI-suggested (reversible)**")
                     for i, opt in enumerate(a["output"]["containment_options"]):
-                        st.markdown(f"`{pretty(opt['action_type'])}` on _{opt['target']}_ — {opt['rationale']}")
+                        st.markdown(f"`{action_label(opt['action_type'])}` on _{opt['target']}_ — {opt['rationale']}")
                         if st.button("Propose this", key=f"aip_{iid}_{i}"):
                             run_action(lambda: wf.propose_containment(c, iid, wf.SYSTEM_ACTOR, opt["action_type"], opt["target"], opt["rationale"], source="ai"),
                                        "Proposed (source: AI)", area=f"ct_{iid}")
@@ -465,7 +492,7 @@ def _containment_card(inc, a) -> None:
                     st.divider()
                 with st.form(f"cp_{iid}", clear_on_submit=True):
                     st.markdown("**Custom proposal**")
-                    t = st.selectbox("Action", sorted(REVERSIBLE_CONTAINMENT) + ["account_lockout"], format_func=pretty)
+                    t = st.selectbox("Action", CONTAINMENT_TYPES, format_func=action_label)
                     target = st.text_input("Target (narrowest effective scope)")
                     why = st.text_input("Rationale")
                     if st.form_submit_button("Propose"):

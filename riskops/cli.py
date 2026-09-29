@@ -1,9 +1,9 @@
 """Command-line entry points.
 
   python -m riskops.cli seed [--reset]            reset/seed the local demo database
-  python -m riskops.cli eval --system rules --rules rules-v1.0 --split dev
-  python -m riskops.cli eval --system live --rules rules-v1.1 --prompt prompt-v2 --split dev
-  python -m riskops.cli eval --system fault:under_severity --rules rules-v1.1 --split all
+  python -m riskops.cli eval --system rules --rules rules-v2.0 --split dev
+  python -m riskops.cli eval --system live --rules rules-v2.1 --prompt prompt-v3 --split dev
+  python -m riskops.cli eval --system fault:under_severity --rules rules-v2.1 --split all
   python -m riskops.cli compare <run_dir> <run_dir> ...
   python -m riskops.cli claims <run_dir>/claim_review_worksheet.csv
 """
@@ -27,8 +27,8 @@ def main(argv: list[str] | None = None) -> int:
 
     e = sub.add_parser("eval", help="run an evaluation")
     e.add_argument("--system", default="rules", help="rules | live | fault:<mode>")
-    e.add_argument("--rules", default="rules-v1.0")
-    e.add_argument("--prompt", default="prompt-v1")
+    e.add_argument("--rules", default=config.BASELINE_RULE_VERSION)
+    e.add_argument("--prompt", default="prompt-v3")
     e.add_argument("--split", default="dev", choices=["dev", "held_out", "all"])
     e.add_argument("--label", default=None)
     e.add_argument("--record-in-db", action="store_true", help="also record the run summary in the app database")

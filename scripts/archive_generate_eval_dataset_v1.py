@@ -1,4 +1,8 @@
-"""Generate the synthetic evaluation dataset.
+"""ARCHIVED (taxonomy v1). Generates the v1 synthetic evaluation dataset into
+data/eval/archive_v1/. Kept for reproducibility of the archived v1 results in
+evaluation/archive_v1/. The current dataset is built by scripts/generate_eval_dataset.py.
+
+Original description: Generate the synthetic evaluation dataset.
 
 Writes three files under data/eval/:
   cases.jsonl   - intake records only (what the assessment pipeline may see)
@@ -23,7 +27,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent.parent / "data" / "eval"
+OUT = Path(__file__).resolve().parent.parent / "data" / "eval" / "archive_v1"
 BASE = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
 CASES: list[dict] = []
 LABELS: list[dict] = []
