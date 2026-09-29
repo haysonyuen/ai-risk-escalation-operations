@@ -298,7 +298,7 @@ def test_concurrent_first_load_seeds_once_without_collision(tmp_path):
     and crashed with 'Incident INC-1001 already exists'."""
     import threading
 
-    from riskops.seed import ensure_seeded
+    from riskops.demo_db import ensure_seeded
 
     target = tmp_path / "shared.db"
     errors = []
