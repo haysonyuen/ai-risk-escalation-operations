@@ -26,7 +26,7 @@ from .schemas import SEVERITY_ORDER, IncidentIntake
 
 SYSTEM_EVIDENCE = {
     "conversation_excerpt", "tool_action_log", "file_diff", "approval_event", "telemetry",
-    "classifier_output", "account_settings", "reviewer_note",
+    "classifier_output", "account_settings", "reviewer_note", "restricted_evidence_ref",
 }
 KEY_FIELDS = [
     "file_action", "external_action_attempted", "user_approved", "sensitive_data",
@@ -199,7 +199,7 @@ def evaluate(incident: IncidentIntake, version: str) -> RuleResult:
             severity = f["floor"]
             break
 
-    categories = [c["category"] for c in rules["category_rules"] if matches(c, signals)] or ["benign_noise"]
+    categories = list(dict.fromkeys(c["category"] for c in rules["category_rules"] if matches(c, signals))) or ["benign_noise"]
     route = rules["default_route"]
     for cat, r in rules["route_priority"]:
         if cat in categories:

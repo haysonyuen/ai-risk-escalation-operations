@@ -1,0 +1,479 @@
+{
+  "run_id": "20260929T044857-rules_only_baseline-rules-rules-v2.1-dev-9dca",
+  "created_at": "2026-09-29T04:48:57+00:00",
+  "label": "Revised rules-v2.1 on dev (tuned on this split)",
+  "evaluation_kind": "rules_only_baseline",
+  "system": "rules",
+  "rule_version": "rules-v2.1",
+  "prompt_version": null,
+  "controls_version": "controls-v1.2",
+  "model_name": null,
+  "split": "dev",
+  "held_out_integrity": {
+    "matches_freeze": true,
+    "status": "untouched",
+    "frozen_at": "2026-09-29T04:48:01+00:00",
+    "disclosures": [
+      {
+        "date": "2026-09-29T04:48:01+00:00",
+        "change": "Same-author risk: the same author wrote rules-v2.0 and this dataset in one session. rules-v2.0 was drafted first; its severe-harm lexicons were then switched to the structured restricted-evidence fields (policy_area=..., content_provided=...) when that format was designed for content-safety reasons, before any case was written. Detecting those fields is intended (it is how a restricted triage system would expose these cases), but it makes severe-area results easier than free-text reports would be.",
+        "trigger": "Content-safety decision: severe-harm cases (CBRN, child safety, self-harm, violent extremism) record only structured metadata and a restricted evidence pointer."
+      }
+    ]
+  },
+  "labels_disclaimer": "Labels are provisional author-generated judgments on synthetic cases, not independently validated ground truth.",
+  "interpretation": "Deterministic rules; says nothing about model quality.",
+  "metrics": {
+    "n_cases": 44,
+    "recommendation_before_controls": {
+      "exact_match": {
+        "value": 0.9318181818181818,
+        "numerator": 41,
+        "denominator": 44
+      },
+      "within_acceptable_range": {
+        "value": 1.0,
+        "numerator": 44,
+        "denominator": 44
+      },
+      "p0p1_precision": {
+        "value": 1.0,
+        "numerator": 19,
+        "denominator": 19
+      },
+      "p0p1_recall": {
+        "value": 0.95,
+        "numerator": 19,
+        "denominator": 20
+      },
+      "p0p1_missed_where_all_acceptable_tiers_are_p0p1": 0,
+      "under_severity_outside_range": 0,
+      "over_severity_outside_range": 0,
+      "confusion_matrix_expected_rows_predicted_cols": {
+        "P0": {
+          "P0": 5,
+          "P1": 0,
+          "P2": 0,
+          "P3": 0,
+          "none": 0
+        },
+        "P1": {
+          "P0": 1,
+          "P1": 13,
+          "P2": 1,
+          "P3": 0,
+          "none": 0
+        },
+        "P2": {
+          "P0": 0,
+          "P1": 0,
+          "P2": 7,
+          "P3": 0,
+          "none": 0
+        },
+        "P3": {
+          "P0": 0,
+          "P1": 0,
+          "P2": 1,
+          "P3": 16,
+          "none": 0
+        }
+      },
+      "note": "Provider recommendation on schema-valid assessments only (denominator = valid assessments)."
+    },
+    "after_deterministic_controls": {
+      "exact_match": {
+        "value": 0.9318181818181818,
+        "numerator": 41,
+        "denominator": 44
+      },
+      "within_acceptable_range": {
+        "value": 1.0,
+        "numerator": 44,
+        "denominator": 44
+      },
+      "p0p1_precision": {
+        "value": 1.0,
+        "numerator": 19,
+        "denominator": 19
+      },
+      "p0p1_recall": {
+        "value": 0.95,
+        "numerator": 19,
+        "denominator": 20
+      },
+      "p0p1_missed_where_all_acceptable_tiers_are_p0p1": 0,
+      "under_severity_outside_range": 0,
+      "over_severity_outside_range": 0,
+      "confusion_matrix_expected_rows_predicted_cols": {
+        "P0": {
+          "P0": 5,
+          "P1": 0,
+          "P2": 0,
+          "P3": 0,
+          "none": 0
+        },
+        "P1": {
+          "P0": 1,
+          "P1": 13,
+          "P2": 1,
+          "P3": 0,
+          "none": 0
+        },
+        "P2": {
+          "P0": 0,
+          "P1": 0,
+          "P2": 7,
+          "P3": 0,
+          "none": 0
+        },
+        "P3": {
+          "P0": 0,
+          "P1": 0,
+          "P2": 1,
+          "P3": 16,
+          "none": 0
+        }
+      },
+      "note": "Recommendation after controls, all cases (failed assessments use the rules recommendation, labeled)."
+    },
+    "routing": {
+      "primary_route_exact": {
+        "value": 0.8863636363636364,
+        "numerator": 39,
+        "denominator": 44
+      },
+      "primary_route_acceptable": {
+        "value": 1.0,
+        "numerator": 44,
+        "denominator": 44
+      }
+    },
+    "mandatory_review": {
+      "compliance_flagged_when_required": {
+        "value": 1.0,
+        "numerator": 27,
+        "denominator": 27
+      },
+      "flagged_when_not_required": {
+        "value": 0.058823529411764705,
+        "numerator": 1,
+        "denominator": 17
+      }
+    },
+    "schema_valid_rate": {
+      "value": 1.0,
+      "numerator": 44,
+      "denominator": 44
+    },
+    "assessment_failures_routed_to_manual_review": {
+      "value": null,
+      "numerator": 0,
+      "denominator": 0,
+      "undefined_reason": "no failures"
+    },
+    "invalid_evidence_reference_rate_by_fact": {
+      "value": 0.0,
+      "numerator": 0,
+      "denominator": 89
+    },
+    "assessments_with_any_invalid_reference": {
+      "value": 0.0,
+      "numerator": 0,
+      "denominator": 44
+    },
+    "claim_support_accuracy": {
+      "value": null,
+      "undefined_reason": "No human claim-support reviews recorded for this run (see claim_review_worksheet.csv).",
+      "reviewed": 0
+    },
+    "latency_ms": {
+      "mean": 0.05880863636129809,
+      "p95": 0.0830299999847739,
+      "n": 44
+    },
+    "cost_usd_estimate": {
+      "total": null,
+      "n_with_cost": 0
+    },
+    "by_category": {
+      "AGENT": {
+        "n": 4,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "APPEAL": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "undefined_reason": "no case in category requires mandatory review"
+        }
+      },
+      "CBRN": {
+        "n": 4,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        }
+      },
+      "CHILD": {
+        "n": 4,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 4,
+          "denominator": 4
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "CYBER": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "FAILURE": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "undefined_reason": "no case in category requires mandatory review"
+        }
+      },
+      "FRAUD": {
+        "n": 2,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "INACCURATE": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "INFLUENCE": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "INJ": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "MANIP": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "PRIVACY": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "SELFHARM": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "XTENANT": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      }
+    },
+    "auto_hold_c7": {
+      "fired": 3,
+      "expected": 3,
+      "precision": {
+        "value": 1.0,
+        "numerator": 3,
+        "denominator": 3
+      },
+      "recall": {
+        "value": 1.0,
+        "numerator": 3,
+        "denominator": 3
+      },
+      "fired_when_not_expected": [],
+      "missed": [],
+      "note": "Expected = labeled P0 in CBRN or child safety. A pause on a case labeled P1 is counted as unwarranted here even though the pause is reversible."
+    },
+    "category_recall": {
+      "value": 0.9166666666666666,
+      "numerator": 33,
+      "denominator": 36
+    }
+  },
+  "failures": []
+}

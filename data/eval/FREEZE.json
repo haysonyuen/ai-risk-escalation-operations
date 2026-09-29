@@ -1,0 +1,66 @@
+{
+  "dataset_version": "eval-v2 (taxonomy-v2)",
+  "frozen_at": "2026-09-29T04:48:01+00:00",
+  "held_out_case_ids": [
+    "EVAL-045",
+    "EVAL-046",
+    "EVAL-047",
+    "EVAL-048",
+    "EVAL-049",
+    "EVAL-050",
+    "EVAL-051",
+    "EVAL-052",
+    "EVAL-053",
+    "EVAL-054",
+    "EVAL-055",
+    "EVAL-056",
+    "EVAL-057",
+    "EVAL-058",
+    "EVAL-059",
+    "EVAL-060",
+    "EVAL-061",
+    "EVAL-062",
+    "EVAL-063",
+    "EVAL-064",
+    "EVAL-065",
+    "EVAL-066",
+    "EVAL-067",
+    "EVAL-068",
+    "EVAL-069",
+    "EVAL-070",
+    "EVAL-071",
+    "EVAL-072",
+    "EVAL-073",
+    "EVAL-074",
+    "EVAL-075",
+    "EVAL-076",
+    "EVAL-077",
+    "EVAL-078",
+    "EVAL-079",
+    "EVAL-080"
+  ],
+  "sha256_cases_and_labels": "622fde2d054dca30c57070190832d5823e7e8de10426467b447f60e3318bd2a3",
+  "rule_versions_existing_at_freeze": [
+    "rules-v2.0"
+  ],
+  "status": "untouched",
+  "statement": "Held-out cases and labels were frozen before any v2 evaluation run and before any v2 rule tuning. Development failures only may guide rule changes. If held-out results are ever used to change rules, set status to 'used-for-tuning' and disclose it.",
+  "disclosures": [
+    {
+      "date": "2026-09-29T04:48:01+00:00",
+      "change": "Same-author risk: the same author wrote rules-v2.0 and this dataset in one session. rules-v2.0 was drafted first; its severe-harm lexicons were then switched to the structured restricted-evidence fields (policy_area=..., content_provided=...) when that format was designed for content-safety reasons, before any case was written. Detecting those fields is intended (it is how a restricted triage system would expose these cases), but it makes severe-area results easier than free-text reports would be.",
+      "trigger": "Content-safety decision: severe-harm cases (CBRN, child safety, self-harm, violent extremism) record only structured metadata and a restricted evidence pointer."
+    }
+  ],
+  "held_out_evaluations": [
+    {
+      "date": "2026-09-29",
+      "runs": [
+        "rules-v2.0 held_out",
+        "rules-v2.1 held_out"
+      ],
+      "used_for_tuning": false,
+      "note": "First held-out runs, after rules-v2.1 was finalized on dev. Both versions: severity within range 30/36; v2.1 tuning on dev (44/44) did not carry over to held-out severity. Category recall 24/27 -> 25/27. C7 auto-pause 3/3 fired as expected for both. Two held-out P0 cases (EVAL-052 credible threat, EVAL-057 HR data exposure) are rated P1. No rule changes were made from these results."
+    }
+  ]
+}

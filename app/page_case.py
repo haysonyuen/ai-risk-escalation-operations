@@ -411,7 +411,7 @@ def _containment_card(inc, a) -> None:
     pending = [x for x in acts if x["status"] == "proposed"]
     holds = [x for x in acts if x["status"] == "active" and x["proposed_source"] == "auto_hold" and not x["hold_review_outcome"]]
     active = [x for x in acts if x["status"] == "active" and x not in holds]
-    title = f"Containment — {len(pending)} pending, {len(active) + len(holds)} active" + (" · ⏸ AUTO-PAUSED" if holds else "")
+    title = f"Containment — {len(pending)} pending, {len(active) + len(holds)} active" + (" · ⏸️ AUTO-PAUSED" if holds else "")
     with st.expander(title, expanded=bool(pending or active or holds) or inc["status"] == "CONTAINMENT"):
         md(badge("SIMULATED — nothing is executed against any system", "b-sim-action"))
         hint_hold = permission_hint("review_auto_hold")
@@ -420,7 +420,7 @@ def _containment_card(inc, a) -> None:
             due = datetime.fromisoformat(x["review_by"])
             overdue = due <= datetime.now(timezone.utc)
             with st.container(border=True):
-                md(badge("⏸ AUTO-PAUSED · C7", "b-p0") + f" <b>{action_label(x['action_type'])}</b> on {esc(x['target'])}"
+                md(badge("⏸️ AUTO-PAUSED · C7", "b-p0") + f" <b>{action_label(x['action_type'])}</b> on {esc(x['target'])}"
                    + f"<br><span class='small'>Applied automatically {ago(x['proposed_at'])} · {esc(x['rationale'])}<br>"
                    + ("<b>Review overdue — escalated to the Incident Lead. The pause stays on until a person decides.</b>" if overdue
                       else f"Confirm or lift {relative((due - datetime.now(timezone.utc)).total_seconds() / 60)} · it never lifts itself")

@@ -63,92 +63,132 @@ def seed(path: str | None = None, now: datetime | None = None) -> Path:
     def at(iid, minutes):
         return clock(t0[iid] + timedelta(minutes=minutes))
 
-    # INC-1001: P0 confirmed, containment approved by the Incident Lead, investigating.
-    with at("INC-1001", 4):
-        a = wf.get_assessment(conn, wf.get_incident(conn, "INC-1001")["current_assessment_id"])
-        opt = a["output"]["containment_options"][0]
-        ca = wf.propose_containment(conn, "INC-1001", SYS, opt["action_type"], opt["target"], opt["rationale"], source="ai", origin=S)
-    with at("INC-1001", 25):
+    def pending_ai_option(iid, action_type):
+        acts = wf.get_assessment(conn, wf.get_incident(conn, iid)["current_assessment_id"])
+        return next(o for o in acts["output"]["containment_options"] if o["action_type"] == action_type)
+
+    # INC-1001: P0 CBRN. C7 paused the session automatically at assessment; Safety confirmed the
+    # pause, the Incident Lead confirmed P0 and approved a classifier block; now investigating.
+    hold = conn.execute("SELECT action_id FROM containment_actions WHERE incident_id='INC-1001' AND proposed_source='auto_hold'").fetchone()[0]
+    with at("INC-1001", 12):
+        wf.review_auto_hold(conn, hold, A["priya.safety"], True, "Specialist verdict E1 confirmed; keep the session paused.", origin=S)
+    with at("INC-1001", 20):
         wf.decide_severity(conn, "INC-1001", A["sam.lead"], "P0", "safety", ["Incident Lead", "Safety", "Legal/Privacy", "Engineering"],
-                           reason="Read E1-E3 in full; facilitation offer is explicit in E2.", evidence_reviewed=["E1", "E2", "E3"], origin=S)
+                           reason="Specialist verdict (E1) and classifier record (E2) agree; restricted content reviewed by Safety.",
+                           evidence_reviewed=["E1", "E2", "E3"], origin=S)
+        opt = pending_ai_option("INC-1001", "deploy_classifier_block")
+        ca = wf.propose_containment(conn, "INC-1001", SYS, opt["action_type"], opt["target"], opt["rationale"], source="ai", origin=S)
     with at("INC-1001", 30):
-        wf.decide_containment(conn, ca, A["sam.lead"], True, "Pause transaction tools for this account while Safety and Legal review.", origin=S)
+        wf.decide_containment(conn, ca, A["sam.lead"], True, "Narrow block on the request pattern while the threshold is reviewed.", origin=S)
     with at("INC-1001", 35):
-        wf.transition(conn, "INC-1001", "INVESTIGATING", A["sam.lead"], "Safety actionability review started", origin=S)
+        wf.transition(conn, "INC-1001", "INVESTIGATING", A["sam.lead"], "Safety reviewing other sessions from the account", origin=S)
     with at("INC-1001", 70):
-        wf.add_note(conn, "INC-1001", "Safety: no order placed per E1; reviewing whether E2 wording was actionable. Legal consulted on obligations.", A["priya.safety"], origin=S)
+        wf.add_note(conn, "INC-1001", "Safety: no other sessions from this account in the last 30 days. Engineering reviewing the blocking threshold.",
+                    A["priya.safety"], origin=S)
 
-    # INC-1003: fixture under-calls; analyst overrides with reason; containment approved.
-    with at("INC-1003", 180):
-        wf.decide_severity(conn, "INC-1003", A["alex.riskops"], "P1", "product_security",
-                           ["Incident Lead", "Product Security", "Engineering", "Safety", "Product/UX"],
-                           reason="E2 shows hidden page instructions directing the post; this is untrusted-instruction following, not UX confusion.",
-                           override_reason_code="evidence_contradicts_ai", evidence_reviewed=["E1", "E2", "E3"], origin=S)
-        wf.transition(conn, "INC-1003", "INVESTIGATING", A["alex.riskops"], "Product Security engaged", origin=S)
-        ca3 = wf.propose_containment(conn, "INC-1003", A["alex.riskops"], "isolate_untrusted_instructions",
-                                     "web content ingestion in the browser extension for this workspace",
-                                     "Treat page text as data while Product Security investigates.", origin=S)
-    with at("INC-1003", 215):
-        wf.decide_containment(conn, ca3, A["sam.lead"], True, "Narrow, reversible control; approve for 24h review.", origin=S)
-    with at("INC-1003", 400):
-        wf.add_note(conn, "INC-1003", "Engineering: channel post deleted; checking other sessions that visited promo.example.test.", A["lee.eng"], origin=S)
+    # INC-1002: P0 child safety, 25 minutes old. C7 paused the session; nobody has confirmed or
+    # lifted it yet, so it sits at the top of the queue (left open for the demo).
 
-    # INC-1004: P2 approval-fatigue pattern, in response stage with a handoff draft.
-    with at("INC-1004", 600):
-        wf.decide_severity(conn, "INC-1004", A["alex.riskops"], "P2", "product_ux", ["Product/UX", "Support", "Risk Ops"],
-                           reason="Approval-fatigue pattern (E1, E2) belongs with Product/UX, not Engineering.",
-                           override_reason_code="routing_ownership", evidence_reviewed=["E1", "E2"], origin=S)
-        wf.transition(conn, "INC-1004", "INVESTIGATING", A["alex.riskops"], origin=S)
-    with at("INC-1004", 2000):
-        wf.transition(conn, "INC-1004", "RESPONSE", A["alex.riskops"], "Pattern documented; handing off to Product/UX", origin=S)
+    # INC-1004: fixture under-calls an injection exfiltration as an agent mis-send (P2); C3 raised it
+    # to P0 and C6 kept the rules' specialist route (Legal/Privacy). The analyst confirmed P0 and
+    # re-routed to Product Security (override: routing); the lead approved key rotation.
+    with at("INC-1004", 40):
+        wf.decide_severity(conn, "INC-1004", A["alex.riskops"], "P0", "product_security",
+                           ["Incident Lead", "Product Security", "Engineering", "Legal/Privacy"],
+                           reason="E2 shows hidden instructions in the newsletter drove the send; injection-driven exfiltration is owned by Product Security, with Legal/Privacy involved.",
+                           override_reason_code="routing_ownership", evidence_reviewed=["E1", "E2", "E3"], origin=S)
+        wf.transition(conn, "INC-1004", "INVESTIGATING", A["alex.riskops"], "Product Security engaged", origin=S)
+        rot = wf.propose_containment(conn, "INC-1004", A["alex.riskops"], "rotate_credentials", "the two exposed production API keys",
+                                     "Keys were used from an unknown IP; they must be rotated.", origin=S)
+        iso = wf.propose_containment(conn, "INC-1004", A["alex.riskops"], "isolate_untrusted_instructions",
+                                     "email content ingestion for this workspace", "Treat newsletter text as data while Product Security investigates.", origin=S)
+    with at("INC-1004", 55):
+        wf.decide_containment(conn, rot, A["sam.lead"], True, "Keys confirmed used externally (E3); rotate both now, customer informed via their admin.", origin=S)
+        wf.decide_containment(conn, iso, A["sam.lead"], True, "Narrow, reversible control; approve for 24h review.", origin=S)
+    with at("INC-1004", 300):
+        wf.add_note(conn, "INC-1004", "Engineering: newsletter sender blocked; checking other workspaces that received it.", A["lee.eng"], origin=S)
+
+    # INC-1005: P1 cyber, investigating.
+    with at("INC-1005", 120):
+        wf.decide_severity(conn, "INC-1005", A["alex.riskops"], "P1", "safety", ["Incident Lead", "Safety", "Threat Intel", "Product Security"],
+                           reason="Reviewer confirmed functional malware (E1); no evidence of deployment yet.", evidence_reviewed=["E1", "E2"], origin=S)
+        wf.transition(conn, "INC-1005", "INVESTIGATING", A["alex.riskops"], "Threat Intel checking for related accounts", origin=S)
+
+    # INC-1006: P1 influence operation; rate limit approved; in response with a handoff draft.
+    with at("INC-1006", 180):
+        wf.decide_severity(conn, "INC-1006", A["alex.riskops"], "P1", "threat_intel", ["Incident Lead", "Threat Intel", "Safety", "Legal/Privacy"],
+                           reason="Coordination confirmed by shared payment instrument and templates (E1, E2).", evidence_reviewed=["E1", "E2"], origin=S)
+        wf.transition(conn, "INC-1006", "INVESTIGATING", A["alex.riskops"], origin=S)
+        opt = pending_ai_option("INC-1006", "rate_limit_accounts")
+        rl = wf.propose_containment(conn, "INC-1006", SYS, opt["action_type"], opt["target"], opt["rationale"], source="ai", origin=S)
+    with at("INC-1006", 200):
+        wf.decide_containment(conn, rl, A["sam.lead"], True, "Rate-limit the cluster while Threat Intel prepares takedown.", origin=S)
+    with at("INC-1006", 1500):
+        wf.transition(conn, "INC-1006", "RESPONSE", A["alex.riskops"], "Takedown plan ready; handing off", origin=S)
         from .communications import generate
-        generate(conn, "INC-1004", "handoff", SYS, origin=S)
+        generate(conn, "INC-1006", "handoff", SYS, origin=S)
 
-    # INC-1005: P3 closed with a closure record.
-    with at("INC-1005", 300):
-        wf.decide_severity(conn, "INC-1005", A["alex.riskops"], "P3", "support", ["Support"], reason="Undo question; no harm. v1.0 rules over-rate any file edit as P2.", override_reason_code="false_positive",
-                           evidence_reviewed=["E1"], origin=S)
-        wf.transition(conn, "INC-1005", "RESPONSE", A["alex.riskops"], origin=S)
+    # INC-1007: P1 self-harm; in response; the user acknowledgment draft awaits Safety review.
+    with at("INC-1007", 45):
+        wf.decide_severity(conn, "INC-1007", A["alex.riskops"], "P1", "safety", ["Incident Lead", "Safety", "Support"],
+                           reason="Specialist verdict E1: policy violation toward an at-risk user; welfare follow-up needed.",
+                           evidence_reviewed=["E1", "E2", "E3"], origin=S)
+        wf.transition(conn, "INC-1007", "RESPONSE", A["alex.riskops"], "Welfare follow-up and model fix tracked separately", origin=S)
         from .communications import generate
-        cid = generate(conn, "INC-1005", "user_ack", A["casey.support"], origin=S)
-        wf.review_communication(conn, cid, A["alex.riskops"], True, "Fine to use.", origin=S)
-    with at("INC-1005", 400):
-        wf.close_incident(conn, "INC-1005", {
-            "closure_category": "user_misunderstanding_no_defect", "final_severity": "P3",
-            "root_cause": "User did not know about version history.", "user_customer_impact": "None beyond inconvenience.",
-            "evidence_reviewed": ["E1"], "teams_involved": ["Support"], "actions_taken": "Undo guidance drafted and approved.",
-            "response_status": "Acknowledgment approved (simulated; not sent).", "remaining_mitigation": "None.",
-            "monitoring_required": False, "sign_off_statement": "Reviewed ticket; no defect or risk found."}, A["alex.riskops"], origin=S)
+        generate(conn, "INC-1007", "user_ack", A["casey.support"], origin=S)
 
-    # INC-1006/1007: related reports with different apparent severity; suggestion awaits review.
-    for iid in ("INC-1006", "INC-1007"):
-        with at(iid, 5):
-            target = wf.get_intake(conn, iid)
-            others = [wf.get_intake(conn, r["incident_id"]) for r in conn.execute("SELECT incident_id FROM incidents").fetchall()]
-            wf.record_link_suggestions(conn, iid, dedup.suggest(target, others))
+    # INC-1009: AI assessment timed out (fault test) -> manual review; awaiting a person.
 
     # INC-1011: P2 confirmed late (SLA breach on seeded history).
     with at("INC-1011", 2000):
-        wf.decide_severity(conn, "INC-1011", A["alex.riskops"], "P2", "product_engineering", ["Engineering", "Support"],
-                           reason="Telemetry E1 confirms regression.", evidence_reviewed=["E1"], origin=S)
+        wf.decide_severity(conn, "INC-1011", A["alex.riskops"], "P2", "model_behavior", ["Model Behavior", "Engineering", "Support"],
+                           reason="Audit E1 confirms a dosage unit-conversion regression affecting several users; rules missed the medical context.",
+                           override_reason_code="under_escalation", evidence_reviewed=["E1", "E2"], origin=S)
         wf.transition(conn, "INC-1011", "INVESTIGATING", A["alex.riskops"], origin=S)
 
-    # INC-1012: P2 closed and QA-reviewed.
+    # INC-1012: P2 bias finding, closed and QA-reviewed.
     with at("INC-1012", 700):
-        wf.decide_severity(conn, "INC-1012", A["alex.riskops"], "P2", "product_engineering", ["Engineering", "Product/UX", "Support"],
-                           reason="Recurring pattern confirmed by E1/E2.", evidence_reviewed=["E1", "E2"], origin=S)
+        wf.decide_severity(conn, "INC-1012", A["alex.riskops"], "P2", "model_behavior", ["Model Behavior", "Legal/Privacy", "Enterprise/CS"],
+                           reason="Paired-resume audit E2 confirms the pattern.", evidence_reviewed=["E1", "E2"], origin=S)
         wf.transition(conn, "INC-1012", "INVESTIGATING", A["alex.riskops"], origin=S)
         wf.transition(conn, "INC-1012", "RESPONSE", A["alex.riskops"], origin=S)
-    with at("INC-1012", 3000):
-        wf.close_incident(conn, "INC-1012", {
-            "closure_category": "product_defect", "final_severity": "P2",
-            "root_cause": "Formatter applied to whole file on single-function edits.", "user_customer_impact": "Noisy diffs; reverts needed.",
-            "evidence_reviewed": ["E1", "E2"], "teams_involved": ["Engineering", "Product/UX", "Support"],
-            "actions_taken": "Bug filed; support macro updated.", "response_status": "Macro approved (simulated).",
-            "remaining_mitigation": "Fix scheduled in next release.", "monitoring_required": True,
-            "sign_off_statement": "Evidence reviewed; defect confirmed and routed."}, A["alex.riskops"], origin=S)
     with at("INC-1012", 5000):
+        wf.close_incident(conn, "INC-1012", {
+            "closure_category": "model_behavior_issue", "final_severity": "P2",
+            "root_cause": "Ranking prompt template let name-based signals influence scores.",
+            "user_customer_impact": "Unfair candidate rankings for one enterprise customer over two weeks.",
+            "evidence_reviewed": ["E1", "E2"], "teams_involved": ["Model Behavior", "Legal/Privacy", "Enterprise/CS"],
+            "actions_taken": "Names removed from ranking inputs; customer advised to re-run affected screens.",
+            "response_status": "Customer update approved (simulated; not sent).", "remaining_mitigation": "Fairness eval added to release checks.",
+            "monitoring_required": True, "sign_off_statement": "Evidence reviewed; issue confirmed, mitigated and routed."}, A["alex.riskops"], origin=S)
+    with at("INC-1012", 7000):
         wf.qa_review(conn, "INC-1012", A["sam.lead"], "agree_with_handling", "Sampled P2 closure; severity and routing appropriate.", origin=S)
+
+    # INC-1013: P2 over-refusal appeal; in response.
+    with at("INC-1013", 600):
+        wf.decide_severity(conn, "INC-1013", A["alex.riskops"], "P2", "risk_ops", ["Risk Ops", "Model Behavior", "Enterprise/CS"],
+                           reason="This is an appeal about refusals (E1), not a cyber-misuse case; Risk Ops owns policy exceptions.",
+                           override_reason_code="routing_ownership", evidence_reviewed=["E1", "E2"], origin=S)
+        wf.transition(conn, "INC-1013", "RESPONSE", A["alex.riskops"], "Policy exception review requested", origin=S)
+
+    # INC-1014: P3 classifier false positive, closed.
+    with at("INC-1014", 300):
+        wf.decide_severity(conn, "INC-1014", A["alex.riskops"], "P3", "safety", ["Safety"],
+                           reason="Specialist found no violation (E1): homework at textbook level.", evidence_reviewed=["E1", "E2"], origin=S)
+        wf.transition(conn, "INC-1014", "RESPONSE", A["alex.riskops"], origin=S)
+    with at("INC-1014", 400):
+        wf.close_incident(conn, "INC-1014", {
+            "closure_category": "classifier_false_positive", "final_severity": "P3",
+            "root_cause": "Classifier over-triggers on school chemistry vocabulary.", "user_customer_impact": "None.",
+            "evidence_reviewed": ["E1", "E2"], "teams_involved": ["Safety"], "actions_taken": "Added to the classifier false-positive set.",
+            "response_status": "No user contact needed.", "remaining_mitigation": "None.",
+            "monitoring_required": False, "sign_off_statement": "Specialist verdict reviewed; no violation."}, A["alex.riskops"], origin=S)
+
+    # INC-1015 looks like INC-1004 (same newsletter sender); the suggestion awaits review.
+    with at("INC-1015", 5):
+        target = wf.get_intake(conn, "INC-1015")
+        others = [wf.get_intake(conn, r["incident_id"]) for r in conn.execute("SELECT incident_id FROM incidents").fetchall()]
+        wf.record_link_suggestions(conn, "INC-1015", dedup.suggest(target, others))
 
     # Import evaluation runs already on disk so the Quality page shows actual artifacts.
     for d in sorted(RESULTS_DIR.glob("*/summary.json")):

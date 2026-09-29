@@ -46,7 +46,7 @@ def test_ratio_undefined_handling():
 
 
 def test_rules_eval_runs_and_reports_denominators():
-    s = evaluation.run_eval("rules", "rules-v1.1", split="dev", write=False)
+    s = evaluation.run_eval("rules", "rules-v2.1", split="dev", write=False)
     m = s["metrics"]
     assert m["n_cases"] == len(evaluation.load_splits()["dev"])
     assert m["after_deterministic_controls"]["p0p1_recall"]["denominator"] > 0
@@ -57,11 +57,11 @@ def test_rules_eval_runs_and_reports_denominators():
 def test_live_eval_refuses_without_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(LiveEvaluationUnavailable, match="no offline results were substituted"):
-        evaluation.run_eval("live", "rules-v1.1", split="dev", write=False)
+        evaluation.run_eval("live", "rules-v2.1", split="dev", write=False)
 
 
 def test_fault_injection_run_is_labeled_and_controls_hold():
-    s = evaluation.run_eval("fault:under_severity", "rules-v1.1", split="all", write=False)
+    s = evaluation.run_eval("fault:under_severity", "rules-v2.1", split="all", write=False)
     assert s["evaluation_kind"] == "fault_injection"
     before = s["metrics"]["recommendation_before_controls"]["p0p1_recall"]["value"]
     after = s["metrics"]["after_deterministic_controls"]["p0p1_recall"]["value"]
@@ -69,8 +69,8 @@ def test_fault_injection_run_is_labeled_and_controls_hold():
 
 
 def test_regression_gate_flags_injected_rule_regression():
-    base = evaluation.run_eval("rules", "rules-v1.1", split="all", write=False)
-    bad = evaluation.run_eval("rules", "rules-v1.1-fault-demo", split="all", write=False)
+    base = evaluation.run_eval("rules", "rules-v2.1", split="all", write=False)
+    bad = evaluation.run_eval("rules", "rules-v2.1-fault-demo", split="all", write=False)
     assert bad["evaluation_kind"] == "fault_injection"
     chk = monitoring.regression_check(base, bad)
     assert chk["alert"]

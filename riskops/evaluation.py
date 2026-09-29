@@ -176,7 +176,30 @@ def score(preds: list[dict]) -> dict:
         "latency_ms": {"mean": statistics.mean(lat) if lat else None, "p95": (sorted(lat)[int(0.95 * (len(lat) - 1))] if lat else None), "n": len(lat)},
         "cost_usd_estimate": {"total": sum(costs) if costs else None, "n_with_cost": len(costs)},
         "by_category": categories,
+        "auto_hold_c7": _auto_hold_metrics(preds),
+        "category_recall": _category_metrics(preds),
     }
+
+
+def _auto_hold_metrics(preds: list[dict]) -> dict:
+    fired = [p for p in preds if p.get("auto_hold")]
+    expected = [p for p in preds if p["label"].get("auto_hold_expected")]
+    hit = [p for p in fired if p["label"].get("auto_hold_expected")]
+    return {
+        "fired": len(fired), "expected": len(expected),
+        "precision": ratio(len(hit), len(fired), "the automatic pause never fired"),
+        "recall": ratio(len(hit), len(expected), "no case in this split expects an automatic pause"),
+        "fired_when_not_expected": [p["incident_id"] for p in fired if not p["label"].get("auto_hold_expected")],
+        "missed": [p["incident_id"] for p in expected if not p.get("auto_hold")],
+        "note": "Expected = labeled P0 in CBRN or child safety. A pause on a case labeled P1 is counted as unwarranted here even though the pause is reversible.",
+    }
+
+
+def _category_metrics(preds: list[dict]) -> dict:
+    """Share of cases whose labeled (non-benign) categories were all among the predicted categories."""
+    scored = [p for p in preds if [c for c in p["label"].get("expected_categories", []) if c != "benign_noise"]]
+    hit = [p for p in scored if set(c for c in p["label"]["expected_categories"] if c != "benign_noise") <= set(p.get("categories") or [])]
+    return ratio(len(hit), len(scored), "no case has a non-benign expected category")
 
 
 def run_eval(system: str = "rules", rule_version: str = config.BASELINE_RULE_VERSION, prompt_version: str = "prompt-v3",
@@ -190,7 +213,7 @@ def run_eval(system: str = "rules", rule_version: str = config.BASELINE_RULE_VER
             "incident_id", "status", "error_kind", "provider_kind", "provider_name", "model_name", "model_severity",
             "rules_severity", "controlled_severity", "controlled_route", "mandatory_review", "review_reasons",
             "invalid_evidence_refs", "fact_ref_status", "latency_ms", "cost_usd", "impact", "evidence_quality",
-            "confidence")} | {"triggered_rules": [t["id"] for t in rec["rule_result"]["triggered_rules"]],
+            "confidence", "categories", "auto_hold")} | {"triggered_rules": [t["id"] for t in rec["rule_result"]["triggered_rules"]],
                               "facts": (rec["output"] or {}).get("reported_facts", [])})
     # Labels are joined only now, after all predictions exist.
     labels = load_labels()
@@ -214,7 +237,9 @@ def run_eval(system: str = "rules", rule_version: str = config.BASELINE_RULE_VER
              ("severity_outside_range", p["controlled_severity"] not in p["label"]["acceptable_severities"]),
              ("route_not_acceptable", p["controlled_route"] not in p["label"]["acceptable_routes"]),
              ("missed_mandatory_review", p["label"]["requires_mandatory_review"] and not p["mandatory_review"]),
-             ("assessment_failed", p["status"] == "failed")] if bad]}
+             ("assessment_failed", p["status"] == "failed"),
+             ("auto_pause_missed", p["label"].get("auto_hold_expected") and not p.get("auto_hold")),
+             ("auto_pause_unwarranted", bool(p.get("auto_hold")) and not p["label"].get("auto_hold_expected"))] if bad]}
         for p in preds]
     failures = [f for f in failures if f["problems"]]
     summary = {
@@ -316,7 +341,9 @@ def render_report(s: dict) -> str:
               f"* Facts with invalid evidence references: {_fmt(m['invalid_evidence_reference_rate_by_fact'])}",
               f"* Claim-support accuracy: not reported — {m['claim_support_accuracy']['undefined_reason']}",
               f"* Latency ms (mean / p95, n): {m['latency_ms']['mean']} / {m['latency_ms']['p95']} (n={m['latency_ms']['n']})",
-              f"* Estimated cost USD: {m['cost_usd_estimate']['total']}", "",
+              f"* Estimated cost USD: {m['cost_usd_estimate']['total']}",
+              f"* Category recall (labeled categories all predicted): {_fmt(m['category_recall'])}",
+              f"* C7 automatic pause: fired {m['auto_hold_c7']['fired']}, expected {m['auto_hold_c7']['expected']}; precision {_fmt(m['auto_hold_c7']['precision'])}; recall {_fmt(m['auto_hold_c7']['recall'])}; unwarranted {m['auto_hold_c7']['fired_when_not_expected'] or 'none'}; missed {m['auto_hold_c7']['missed'] or 'none'}", "",
               "## By scenario category (after controls)", "",
               "| category | n | severity in range | route acceptable | review flagged when required |",
               "| --- | --- | --- | --- | --- |"]
@@ -341,6 +368,9 @@ def compare(summaries: list[dict]) -> str:
         ("Mandatory review compliance", lambda m: m["mandatory_review"]["compliance_flagged_when_required"]),
         ("Review over-flagging", lambda m: m["mandatory_review"]["flagged_when_not_required"]),
         ("Schema-valid rate", lambda m: m["schema_valid_rate"]),
+        ("Category recall", lambda m: m["category_recall"]),
+        ("C7 auto-pause recall", lambda m: m["auto_hold_c7"]["recall"]),
+        ("C7 auto-pause precision", lambda m: m["auto_hold_c7"]["precision"]),
     ]
     head = "| Metric | " + " | ".join(f"{s['evaluation_kind']} `{s['rule_version']}` {s['split']}" for s in summaries) + " |"
     lines = [head, "| --- |" + " --- |" * len(summaries)]

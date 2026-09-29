@@ -78,7 +78,7 @@ def render() -> None:
             due = ("⚠ " if x["overdue"] else "") + relative(x["minutes_to_deadline"])
         flags = []
         if x["auto_paused"]:
-            flags.append("⏸")
+            flags.append("⏸️")
         if x["mandatory_review"] and is_open and not x["human_severity"]:
             flags.append("⚑")
         if x["ai_source"] == "fault_injection":
@@ -93,7 +93,7 @@ def render() -> None:
             "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
             "Flags": ", ".join(flags),
         })
-    st.caption(f"{len(rows)} case(s) · most urgent first · click a row to open it · ✓ human-confirmed · AI = unconfirmed recommendation · ⏸ auto-paused, awaiting a person · ⚑ mandatory review · 🧪 fault test")
+    st.caption(f"{len(rows)} case(s) · most urgent first · click a row to open it · ✓ human-confirmed · AI = unconfirmed recommendation · ⏸️ auto-paused, awaiting a person · ⚑ mandatory review · 🧪 fault test")
     if not rows:
         st.info("Nothing here. Try another view or clear the filters.")
         return
@@ -108,7 +108,7 @@ def render() -> None:
             "Next action": st.column_config.TextColumn(width=180),
             "First review": st.column_config.TextColumn(width=100, help="Time to the first-human-review target (prototype SLA assumptions)"),
             "Owner": st.column_config.TextColumn(width=58),
-            "Flags": st.column_config.TextColumn(width=56, help="⏸ session auto-paused (C7), confirm or lift · ⚑ mandatory human review pending · 🧪 fault-injection test data"),
+            "Flags": st.column_config.TextColumn(width=56, help="⏸️ session auto-paused (C7), confirm or lift · ⚑ mandatory human review pending · 🧪 fault-injection test data"),
         })
     sel = event.selection.rows if event and hasattr(event, "selection") else []
     if sel:

@@ -26,6 +26,9 @@ Channel = Literal["support_ticket", "enterprise_report", "safety_reviewer", "int
 EvidenceType = Literal[
     "reporter_statement", "conversation_excerpt", "tool_action_log", "file_diff", "approval_event",
     "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note",
+    # Pointer to material held in a restricted evidence store (e.g. CBRN or child-safety content).
+    # Only structured metadata appears here; the content itself is never copied into the case.
+    "restricted_evidence_ref",
 ]
 
 # Taxonomy v2 (2026-09-29): harm areas modelled on the incident types frontier AI labs

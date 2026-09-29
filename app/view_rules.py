@@ -109,7 +109,8 @@ def render() -> None:
 | C3 | Provider severity below the rules recommendation is raised to it (controls never lower severity) |
 | C4 | Instructions embedded in report text are flagged for review and never followed |
 | C5 | Low confidence on a potentially high/critical-impact case → mandatory review (low confidence ≠ low severity) |
-| C6 | A different route than a specialist route (Safety, Legal/Privacy, Product Security) → specialist route kept and flagged |
+| C6 | A different route than a specialist route (Safety, Child Safety, Threat Intel, Legal/Privacy, Product Security) → specialist route kept and flagged |
+| C7 | P0 recommendation in **CBRN or child safety** (from the rules *or* the AI) → the reported session is paused automatically (simulated). A Safety specialist or the Incident Lead must confirm or lift it; lifting needs a written reason. It never lifts itself: past its review time it escalates to the Incident Lead. Anything stronger (account suspension, mandatory external report) stays a human decision |
 """)
         st.markdown("**Prompt versions** (used only in live mode)")
         pv = st.selectbox("Prompt", sorted(p.stem for p in config.PROMPT_DIR.glob("prompt-v*.md")))

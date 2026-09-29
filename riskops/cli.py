@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import evaluation
+from . import config, evaluation
 
 
 def main(argv: list[str] | None = None) -> int:

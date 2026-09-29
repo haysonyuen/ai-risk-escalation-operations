@@ -82,7 +82,7 @@ def queue(conn, now: datetime | None = None) -> list[dict]:
             "pending": pending, "origin": inc["origin"],
             "next_actions": next_actions(conn, inc["incident_id"]),
             "minutes_to_deadline": round((deadline - now).total_seconds() / 60) if deadline and not reviewed else None,
-            "urgency": (0 if (overdue or holds) else 1, {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[sev],
+            "urgency": (0 if holds else 1 if overdue else 2, {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[sev],
                         (deadline - now).total_seconds() if deadline and not reviewed else 1e12),
         })
     return out
@@ -196,6 +196,7 @@ GATES = [
     ("Severity within acceptable range", lambda m: m["after_deterministic_controls"]["within_acceptable_range"]["value"], 0.05),
     ("Primary route acceptable", lambda m: m["routing"]["primary_route_acceptable"]["value"], 0.05),
     ("Schema-valid rate", lambda m: m["schema_valid_rate"]["value"], 0.0),
+    ("C7 auto-pause recall", lambda m: m.get("auto_hold_c7", {}).get("recall", {}).get("value"), 0.0),
 ]
 
 

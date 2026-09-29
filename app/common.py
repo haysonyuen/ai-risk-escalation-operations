@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 import json
 import os
 import sys
@@ -82,7 +83,8 @@ FIELD_LABEL = {
 }
 TEAMS = SCHEMA_TEAMS
 EVIDENCE_TYPES = ["reporter_statement", "conversation_excerpt", "tool_action_log", "file_diff", "approval_event",
-                  "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note"]
+                  "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note",
+                  "restricted_evidence_ref"]
 ACTORS = {a.actor_id: a for a in wf.SIMULATED_ACTORS}
 
 
@@ -96,8 +98,11 @@ def action_label(t: str) -> str:
 
 def humanize(text: str) -> str:
     """Replace internal route keys in explanatory text with their display names."""
+    # Only underscore keys (e.g. legal_privacy, child_safety): plain words such as "safety" or
+    # "support" are ordinary English in sentences and must not be capitalised.
     for k, v in ROUTE_LABEL.items():
-        text = text.replace(k, v)
+        if "_" in k:
+            text = re.sub(rf"(?<![\w]){re.escape(k)}(?![\w])", v, text)
     return text
 
 

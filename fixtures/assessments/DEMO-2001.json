@@ -42,8 +42,8 @@
     ],
     "contradictions": [],
     "risk_categories": [
-      "sensitive_data",
-      "approval_ux"
+      "enterprise_data_leakage",
+      "agentic_overreach"
     ],
     "recommended_severity": "P2",
     "severity_rationale": "Looks like an approval/UX misunderstanding; no confirmed external access.",

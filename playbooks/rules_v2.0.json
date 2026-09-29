@@ -3,41 +3,20 @@
   "status": "baseline",
   "created": "2026-09-29",
   "taxonomy_version": "taxonomy-v2",
-  "description": "Rules-only baseline for taxonomy v2 (frontier-lab harm areas). Written from the framework's severity table plus lessons carried over from the archived v1 experiment (refusals are working safeguards; narrow 'assistant provided' phrases; low confidence must not lower severity; P3 without a specialist category goes to Support). Written BEFORE the v2 evaluation dataset existed and before any v2 evaluation was run. Keyword lexicons plus structured intake fields; first matching severity rule wins.",
+  "description": "Rules-only baseline for taxonomy v2 (frontier-lab harm areas). Written from the framework's severity table plus lessons carried over from the archived v1 experiment (refusals are working safeguards; narrow 'assistant provided' phrases; low confidence must not lower severity; P3 without a specialist category goes to Support). Written BEFORE the v2 evaluation dataset existed and before any v2 evaluation was run. Severe-harm areas (CBRN, child safety, self-harm, violent extremism) are detected from structured policy fields in classifier output and specialist review notes (policy_area=..., content_provided=yes/no) because their content is held in a restricted evidence store and never described in the ticket. Keyword lexicons plus structured intake fields; first matching severity rule wins.",
   "default_severity": "P3",
   "default_route": "support",
   "lexicons": {
     "cbrn_topic": [
-      "pathogen",
-      "select agent",
-      "bioweapon",
-      "biological weapon",
-      "biological agent",
-      "toxin",
-      "nerve agent",
-      "chemical weapon",
-      "chemical agent",
-      "radiological",
-      "dirty bomb",
-      "nuclear material",
-      "fissile",
-      "uranium enrichment",
-      "explosive device",
-      "improvised explosive",
-      "high explosive",
-      "weaponization",
-      "weaponize",
-      "aerosolization",
-      "transmissibility",
-      "gain-of-function",
-      "viral culture",
-      "viral cultures",
-      "live culture",
-      "live cultures",
-      "precursor chemical",
-      "precursor chemicals",
-      "restricted chemical",
-      "dangerous biological"
+      "policy_area=cbrn",
+      "cbrn policy",
+      "cbrn_policy",
+      "weapons of mass destruction",
+      "chemical weapons",
+      "biological weapons",
+      "radiological weapons",
+      "nuclear weapons",
+      "select agent"
     ],
     "cyber_topic": [
       "malware",
@@ -59,66 +38,23 @@
       "evade antivirus",
       "evades antivirus"
     ],
-    "minor_mention": [
-      "minor",
-      "minors",
-      "underage",
-      "under 18",
-      "child",
-      "children",
-      "a child",
-      "teen",
-      "teenager",
-      "year-old",
-      "school-age",
-      "middle school",
-      "high school student"
-    ],
-    "sexual_content": [
-      "sexual",
-      "sexualized",
-      "sexualised",
-      "sexually explicit",
-      "explicit content",
-      "erotic",
-      "nude",
-      "nudity",
-      "intimate",
-      "romantic role-play",
-      "sexual role-play"
-    ],
-    "child_abuse_explicit": [
-      "csam",
-      "child sexual abuse",
-      "grooming",
-      "sextortion",
-      "child exploitation"
-    ],
     "self_harm_topic": [
+      "policy_area=self_harm",
+      "self-harm policy",
+      "self_harm_policy",
       "suicide",
       "suicidal",
       "self-harm",
-      "self harm",
-      "kill myself",
-      "end my life",
-      "lethal dose",
-      "overdose",
-      "hurt myself"
+      "self harm"
     ],
     "extremism_topic": [
-      "extremist",
-      "terrorist",
-      "terror attack",
-      "violent manifesto",
-      "mass shooting",
-      "mass-casualty",
-      "attack plan",
+      "policy_area=violent_extremism",
+      "violent extremism policy",
+      "violent_extremism_policy",
+      "credible threat",
+      "threat to life",
       "attack planning",
-      "recruitment propaganda",
-      "radicalization",
-      "radicalisation",
-      "bomb threat",
-      "threat to kill"
+      "extremist propaganda"
     ],
     "deepfake_topic": [
       "deepfake",
@@ -208,7 +144,10 @@
       "wrote a",
       "wrote working",
       "complied",
-      "continued the"
+      "continued the",
+      "content_provided=yes",
+      "assistant_output=content_provided",
+      "output=provided"
     ],
     "assistant_refused": [
       "refused",
@@ -218,7 +157,10 @@
       "safety message",
       "redirected",
       "crisis resources",
-      "blocked the"
+      "blocked the",
+      "content_provided=no",
+      "assistant_output=refused",
+      "output=refused"
     ],
     "external_exposure": [
       "sent to an external",
@@ -407,19 +349,24 @@
       "data breach",
       "saw another company",
       "saw someone else's"
+    ],
+    "child_policy": [
+      "policy_area=child_safety",
+      "child safety policy",
+      "child_safety_policy",
+      "csam",
+      "child sexual abuse material",
+      "child exploitation"
+    ],
+    "restricted_evidence": [
+      "restricted evidence store",
+      "restricted_ref="
     ]
   },
   "derived_signals": {
-    "minor_and_sexual": {
-      "all": [
-        "minor_mention",
-        "sexual_content"
-      ]
-    },
     "child_sexual": {
       "any": [
-        "child_abuse_explicit",
-        "minor_and_sexual"
+        "child_policy"
       ]
     },
     "provided_not_refused": {
@@ -1214,7 +1161,7 @@
     },
     {
       "id": "REV-03",
-      "description": "Severe-harm topic (CBRN, child safety, self-harm, violent extremism) mentioned: a specialist must look even if severity seems low.",
+      "description": "Severe-harm policy area (CBRN, child safety, self-harm, violent extremism): a specialist must look even if severity seems low.",
       "any": [
         "severe_topic"
       ]
