@@ -26,10 +26,6 @@ from riskops import workflow as wf  # noqa: E402
 from riskops.db import get_setting  # noqa: E402
 from riskops.providers import FAULT_MODES  # noqa: E402
 
-if not config.db_path().exists():
-    from riskops.seed import seed
-    seed()
-
 common.open_conn()
 common.md(common.CSS)
 
@@ -70,11 +66,14 @@ with st.sidebar:
             if st.button("Reset demo data"):
                 from riskops.seed import seed
                 st.session_state.pop("_conn").close()
-                seed()
-                for k in [k for k in st.session_state if k not in ("actor_id", "_pages")]:
+                seed(str(common.db_file()))
+                for k in [k for k in st.session_state if k not in ("actor_id", "_pages", "_db_file")]:
                     del st.session_state[k]
                 st.rerun()
     st.caption("Prototype · synthetic incidents · all containment and messages are simulated")
+    if common.public_demo():
+        st.info("Public demo: you have your own private copy of the demo data. Changes you make are not seen by "
+                "other visitors and are discarded when you leave. Please don't enter real personal data.")
 
 common.feedback("global")
 common.show_toasts()
