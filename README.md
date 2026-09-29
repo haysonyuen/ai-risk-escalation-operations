@@ -47,7 +47,7 @@ Everything runs offline. For the optional live model mode, copy `.env.example` t
 * **Case**: the whole case on one screen.
   * The **Next** panel says what the case needs and whether your role can do it. If it's someone else's step, one click (**Act as …**) switches to that role.
   * The left side is the case file: the report, the AI assessment with each claim shown beside the evidence it cites, evidence, activity, related reports and AI details.
-  * The right side holds the actions: the severity and routing decision, owner and stage, containment, draft communications, and closure. Controls your role can't use are disabled, with the reason shown.
+  * The right side holds the actions: the severity and routing decision, owner and stage, containment, draft communications, and closure. On desktop this panel stays pinned in view and scrolls on its own, so the actions stay beside the evidence you're reading. Controls your role can't use are disabled, with the reason shown.
 * **New report**: a structured form, or JSON import.
 * **Dashboard**, **Quality & evaluation**, **Rules & playbooks**: oversight, metrics and rule governance.
 * **Working as** (sidebar): switch between simulated roles to see the approval rules in action. This is not a login.

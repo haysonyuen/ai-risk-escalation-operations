@@ -635,8 +635,11 @@ def render() -> None:
         else:
             _ai_details(inc, a)
     with right:
-        _decision_card(inc, intake, a)
-        _stage_card(inc)
-        _containment_card(inc, a)
-        _comms_card(inc)
-        _closure_card(inc)
+        # Keyed container: on desktop it is pinned (sticky) and scrolls on its own, so the actions
+        # stay in view while the case file on the left is read (CSS: .st-key-case_actions).
+        with st.container(key="case_actions"):
+            _decision_card(inc, intake, a)
+            _stage_card(inc)
+            _containment_card(inc, a)
+            _comms_card(inc)
+            _closure_card(inc)

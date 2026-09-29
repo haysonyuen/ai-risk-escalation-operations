@@ -80,3 +80,4 @@ Looking at the app as a first-time visitor arriving from a link turned up five i
 3. **Hard-to-scan queue.** Severity cells are colour-coded, and the flags (⏸️ ⚑ 🧪) sit next to severity so they never scroll out of view. Columns are sized to fit a laptop screen, a 🔒 marks steps your role can't take, and the long legend moved into a **How to read this** popover.
 4. **Crowded sidebar.** The public-demo notice is now a one-line caption instead of a large panel.
 5. **Table-only dashboard.** Issue categories are a bar chart, and override directions use plain words ("severity raised", "only the owning team changed").
+6. **Actions scrolled away while reading.** On the case page, the action panel (decision, owner and stage, containment, communications, closure) is pinned on desktop and scrolls independently of the case file. On narrow screens it stays stacked below the case file.
