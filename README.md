@@ -50,7 +50,7 @@ Everything runs offline. For the optional live model mode, copy `.env.example` t
 | Task | Command |
 | --- | --- |
 | Reset and seed the demo database | `python -m riskops.cli seed` (or **Reset demo data** in the sidebar) |
-| Run the tests | `python -m pytest -q` |
+| Run the tests | `pip install -r requirements-dev.txt` then `python -m pytest -q` |
 | Reproduce every evaluation artifact | `./scripts/run_all_evals.sh` |
 | Run one evaluation | `python -m riskops.cli eval --system rules --rules rules-v1.1 --split held_out` |
 | Compare runs | `python -m riskops.cli compare evaluation/results/<run> evaluation/results/<run>` |
@@ -132,6 +132,7 @@ Full method, results, observed failures and limitations: [`docs/evaluation.md`](
 | [docs/evaluation.md](docs/evaluation.md) | Evaluation methodology, results, observed failures, fault injection, limitations |
 | [docs/demo_walkthrough.md](docs/demo_walkthrough.md) | Five-minute demo script with screenshots |
 | [docs/case_study.md](docs/case_study.md) | Decisions and tradeoffs |
+| [docs/hosting.md](docs/hosting.md) | Hosting a public demo (per-visitor private data) on Streamlit Community Cloud |
 | [docs/ux_review.md](docs/ux_review.md) | Interface review: problems found and the operator-focused redesign |
 | [docs/requirements_traceability.md](docs/requirements_traceability.md) | Requirement → code / test / result table |
 | [docs/timed_review_protocol.md](docs/timed_review_protocol.md) | Optional procedure for a future timed-review user study |

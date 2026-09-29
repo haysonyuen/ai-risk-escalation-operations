@@ -26,10 +26,6 @@ from riskops import workflow as wf  # noqa: E402
 from riskops.db import get_setting  # noqa: E402
 from riskops.providers import FAULT_MODES  # noqa: E402
 
-if not config.db_path().exists():
-    from riskops.seed import seed
-    seed()
-
 common.open_conn()
 common.md(common.CSS)
 
@@ -55,7 +51,8 @@ with st.sidebar:
     if mode != "offline":
         st.warning("Assessment provider: " + ("live model" if mode == "live" else "FAULT INJECTION test"))
     with st.expander("Demo settings"):
-        modes = ["offline", "live"] + [f"fault:{m}" for m in FAULT_MODES]
+        # Public demo: never offer live model calls, even if an API key is configured by mistake.
+        modes = (["offline"] if common.public_demo() else ["offline", "live"]) + [f"fault:{m}" for m in FAULT_MODES]
         labels = {"offline": "Offline (fixtures / simulation)",
                   "live": "Live model" + ("" if config.live_credentials_available() else " — no API key set")}
         labels.update({f"fault:{m}": f"Fault test: {d}" for m, d in FAULT_MODES.items()})
@@ -70,11 +67,14 @@ with st.sidebar:
             if st.button("Reset demo data"):
                 from riskops.seed import seed
                 st.session_state.pop("_conn").close()
-                seed()
-                for k in [k for k in st.session_state if k not in ("actor_id", "_pages")]:
+                seed(str(common.db_file()))
+                for k in [k for k in st.session_state if k not in ("actor_id", "_pages", "_db_file")]:
                     del st.session_state[k]
                 st.rerun()
     st.caption("Prototype · synthetic incidents · all containment and messages are simulated")
+    if common.public_demo():
+        st.info("Public demo: you have your own private copy of the demo data. Changes you make are not seen by "
+                "other visitors and are discarded when you leave. Please don't enter real personal data.")
 
 common.feedback("global")
 common.show_toasts()

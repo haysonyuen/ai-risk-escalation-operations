@@ -1,7 +1,5 @@
+# Runtime dependencies (also what a hosting service installs).
 streamlit>=1.50  # older versions lack st.navigation/segmented_control; run with: python -m streamlit
 pydantic>=2.7
 pandas>=2.2
 anthropic>=0.60
-pytest>=8.0
-# Optional, for scripts/ui_smoke.py and scripts/ui_walkthrough.py (uses an installed Chromium)
-playwright>=1.45

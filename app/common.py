@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import sys
+import tempfile
+import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -169,15 +173,50 @@ def ago(ts: str | None) -> str:
 
 # --------------------------------------------------------------------------- session
 
+def public_demo() -> bool:
+    """Public demo mode: each browser session gets its own private, freshly seeded database.
+    Enable with RISKOPS_PUBLIC_DEMO=1 (env var or Streamlit secret)."""
+    if os.environ.get("RISKOPS_PUBLIC_DEMO") == "1":
+        return True
+    try:
+        return str(st.secrets.get("RISKOPS_PUBLIC_DEMO", "")) == "1"
+    except Exception:  # no secrets file
+        return False
+
+
+SESSION_DB_DIR = Path(tempfile.gettempdir()) / "riskops_sessions"
+
+
+def db_file() -> Path:
+    if not public_demo():
+        return Path(config.db_path())
+    if "_db_file" not in st.session_state:
+        SESSION_DB_DIR.mkdir(parents=True, exist_ok=True)
+        cutoff = time.time() - 12 * 3600  # remove sessions idle for 12h
+        for old in SESSION_DB_DIR.glob("*.db"):
+            try:
+                if old.stat().st_mtime < cutoff:
+                    old.unlink()
+            except OSError:
+                pass
+        st.session_state["_db_file"] = SESSION_DB_DIR / f"{uuid.uuid4().hex}.db"
+    return st.session_state["_db_file"]
+
+
 def open_conn() -> None:
-    """Fresh connection per script run (avoids stale handles if the DB file is replaced)."""
+    """Fresh connection per script run (avoids stale handles if the DB file is replaced).
+    Seeds the database on first use."""
     old = st.session_state.pop("_conn", None)
     if old is not None:
         try:
             old.close()
         except Exception:
             pass
-    st.session_state["_conn"] = connect()
+    path = db_file()
+    if not path.exists():
+        from riskops.seed import seed
+        seed(str(path))
+    st.session_state["_conn"] = connect(path)
 
 
 def conn():

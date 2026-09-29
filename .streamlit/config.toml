@@ -5,3 +5,7 @@ primaryColor = "#d9473a"
 
 [browser]
 gatherUsageStats = false
+
+[client]
+# Hide Streamlit's developer menu ("Deploy", rerun settings) from viewers.
+toolbarMode = "viewer"
