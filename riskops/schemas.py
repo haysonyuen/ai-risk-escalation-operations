@@ -26,32 +26,60 @@ Channel = Literal["support_ticket", "enterprise_report", "safety_reviewer", "int
 EvidenceType = Literal[
     "reporter_statement", "conversation_excerpt", "tool_action_log", "file_diff", "approval_event",
     "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note",
+    # Pointer to material held in a restricted evidence store (e.g. CBRN or child-safety content).
+    # Only structured metadata appears here; the content itself is never copied into the case.
+    "restricted_evidence_ref",
 ]
 
+# Taxonomy v2 (2026-09-29): harm areas modelled on the incident types frontier AI labs
+# commonly describe (catastrophic misuse, severe content harms, platform abuse, data and
+# security, agent and model quality). Taxonomy v1 (generic categories) is archived with the
+# v1 rule sets and evaluation dataset; see docs/versioning.md.
+TAXONOMY_VERSION = "taxonomy-v2"
 RiskCategory = Literal[
-    "harmful_assistance", "sensitive_data", "prompt_injection", "unintended_action",
-    "file_modification", "approval_ux", "synthetic_media", "inaccurate_output",
-    "product_failure", "containment_appeal", "benign_noise",
+    # catastrophic misuse
+    "cbrn", "cyber_misuse",
+    # severe content harms
+    "child_safety", "self_harm", "violent_extremism", "deepfake_ncii",
+    # platform abuse
+    "influence_operations", "fraud_scams", "safeguard_bypass",
+    # data & security
+    "enterprise_data_leakage", "privacy_pii", "prompt_injection", "model_security",
+    # agent & model quality
+    "agentic_overreach", "harmful_inaccuracy", "bias_discrimination",
+    # operations
+    "enforcement_appeal", "product_failure", "benign_noise",
 ]
-Route = Literal["safety", "legal_privacy", "product_security", "product_engineering", "product_ux", "support", "risk_ops"]
-ROUTES = ["safety", "legal_privacy", "product_security", "product_engineering", "product_ux", "support", "risk_ops"]
+RISK_CATEGORIES = list(RiskCategory.__args__)
+# Categories where a P0 recommendation triggers the C7 automatic session pause.
+AUTO_HOLD_CATEGORIES = {"cbrn", "child_safety"}
+Route = Literal["safety", "child_safety", "threat_intel", "product_security", "legal_privacy", "model_behavior",
+                "product_engineering", "product_ux", "risk_ops", "support"]
+ROUTES = list(Route.__args__)
 Team = Literal[
-    "Risk Ops", "Incident Lead", "Safety", "Support", "Engineering", "Product Security",
-    "Product/UX", "Legal/Privacy", "Enterprise/CS", "Data/Analytics",
+    "Risk Ops", "Incident Lead", "Safety", "Child Safety", "Threat Intel", "Support", "Engineering",
+    "Product Security", "Product/UX", "Legal/Privacy", "Enterprise/CS", "Model Behavior", "Data/Analytics",
 ]
+TEAMS = list(Team.__args__)
 Level = Literal["critical", "high", "moderate", "low", "unknown"]
 EvidenceQuality = Literal["strong", "partial", "weak", "none"]
 Confidence = Literal["high", "medium", "low"]
 ContainmentType = Literal[
     "pause_interaction", "restrict_tool_action", "require_confirmation_destructive",
     "warn_sensitive_file_access", "isolate_untrusted_instructions", "pause_external_transactions",
-    "workspace_safe_mode", "account_lockout",
+    "workspace_safe_mode", "disable_connector", "rotate_credentials", "deploy_classifier_block",
+    "rate_limit_accounts", "account_lockout", "file_mandatory_report",
 ]
 REVERSIBLE_CONTAINMENT = {
     "pause_interaction", "restrict_tool_action", "require_confirmation_destructive",
     "warn_sensitive_file_access", "isolate_untrusted_instructions", "pause_external_transactions",
-    "workspace_safe_mode",
+    "workspace_safe_mode", "disable_connector", "deploy_classifier_block", "rate_limit_accounts",
 }
+# Not reversible: need a human-confirmed P0/P1 and the Incident Lead (see workflow.decide_containment).
+# rotate_credentials cannot be undone but is low-risk to the user; file_mandatory_report records that a
+# (simulated) legally required external report, e.g. to a child-protection hotline, was prepared.
+IRREVERSIBLE_CONTAINMENT = {"account_lockout", "rotate_credentials", "file_mandatory_report"}
+CONTAINMENT_TYPES = sorted(REVERSIBLE_CONTAINMENT | IRREVERSIBLE_CONTAINMENT)
 
 ProviderKind = Literal["live_model", "offline_fixture", "offline_simulation", "rules_only", "fault_injection"]
 

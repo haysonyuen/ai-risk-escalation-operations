@@ -1,0 +1,1 @@
+incident_id,fact_index,statement,cited_evidence_ids,cited_evidence_text,verdict(supported|partially_supported|unsupported|cannot_determine),reviewer,note

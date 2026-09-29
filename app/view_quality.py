@@ -47,6 +47,11 @@ def _show_run(s: dict) -> None:
             {"Metric": "Review flagged when not required", "Provider recommendation (valid only)": "", "After deterministic controls (all)": fmt(m["mandatory_review"]["flagged_when_not_required"])},
             {"Metric": "Schema-valid assessments", "Provider recommendation (valid only)": fmt(m["schema_valid_rate"]), "After deterministic controls (all)": ""},
             {"Metric": "Facts with invalid evidence refs", "Provider recommendation (valid only)": fmt(m["invalid_evidence_reference_rate_by_fact"]), "After deterministic controls (all)": ""},
+            {"Metric": "Category recall (labeled categories all predicted)", "Provider recommendation (valid only)": "",
+             "After deterministic controls (all)": fmt(m["category_recall"]) if "category_recall" in m else "n/a"},
+            {"Metric": "C7 automatic pause: recall / precision", "Provider recommendation (valid only)": "",
+             "After deterministic controls (all)": (f"{fmt(m['auto_hold_c7']['recall'])} / {fmt(m['auto_hold_c7']['precision'])}"
+                                                   if "auto_hold_c7" in m else "n/a")},
             {"Metric": "Claim-support accuracy", "Provider recommendation (valid only)": "not reported (0 human reviews)", "After deterministic controls (all)": ""},
             {"Metric": "Latency / cost", "Provider recommendation (valid only)": f"mean {m['latency_ms']['mean']:.2f} ms" if m['latency_ms']['mean'] is not None else "n/a",
              "After deterministic controls (all)": f"${m['cost_usd_estimate']['total']:.4f}" if m['cost_usd_estimate']['total'] else "no cost (offline)"}]
@@ -121,10 +126,10 @@ def render() -> None:
             st.caption("The held-out split was frozen before tuning. Do not change rules based on held-out failures without recording a disclosure in data/eval/FREEZE.json.")
         if system == "live" and not config.live_credentials_available():
             st.error("Live evaluation is pending: ANTHROPIC_API_KEY is not set. It will not fall back to offline results. Run later with:")
-            st.code("export ANTHROPIC_API_KEY=...\npython -m riskops.cli eval --system live --rules rules-v1.1 --prompt prompt-v2 --split dev --record-in-db")
+            st.code("export ANTHROPIC_API_KEY=...\npython -m riskops.cli eval --system live --rules rules-v2.1 --prompt prompt-v3 --split dev --record-in-db")
         if st.button("Run evaluation"):
             def go():
-                s = evaluation.run_eval(system, version, "prompt-v2", split, out_dir=config.RESULTS_DIR / "ui_runs")
+                s = evaluation.run_eval(system, version, "prompt-v3", split, out_dir=config.RESULTS_DIR / "ui_runs")
                 wf.record_eval_run(conn(), s, origin="demo")
                 return s["run_id"]
             try:
@@ -148,7 +153,9 @@ def render() -> None:
         st.markdown("""
 - Cases and labels are synthetic and author-labeled; labels are provisional, not independently validated.
 - Offline "AI" outputs are hand-authored fixtures or a deterministic restatement of rules — not measured model performance.
-- The dev split was used to write rules-v1.1, so dev results for v1.1 are optimistic by construction.
+- The dev split was used to write rules-v2.1, so dev results for v2.1 are optimistic by construction (44/44 on dev, but 30/36 on held-out — the same as rules-v2.0).
+- The same author wrote the rules and the dataset. Severe-harm cases (CBRN, child safety, self-harm, violent extremism) are recorded as structured restricted-evidence fields, which rules can match more easily than free-text reports (disclosed in FREEZE.json).
+- Taxonomy v1 results are archived in evaluation/archive_v1/ and are not comparable with these.
 - Containment and communications are simulated; there is no integration with real systems.
 - Roles are simulated identities; there is no authentication.
 - Monitoring numbers come from seeded synthetic history plus local demo clicks.

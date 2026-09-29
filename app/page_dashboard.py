@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from common import CATEGORY_LABEL, conn, go, pretty
-from riskops import monitoring
+from riskops import config, monitoring
 from riskops.db import get_setting, rows
 
 
@@ -20,17 +20,17 @@ def _quality_alerts() -> None:
     runs = [json.loads(r["summary_json"]) for r in rows(c, "SELECT summary_json FROM eval_runs ORDER BY created_at")]
     shown = False
     for split in ("held_out", "dev", "all"):
-        base = [r for r in runs if r["split"] == split and r["rule_version"] == "rules-v1.0" and r["system"] == "rules"]
+        base = [r for r in runs if r["split"] == split and r["rule_version"] == config.BASELINE_RULE_VERSION and r["system"] == "rules"]
         cand = [r for r in runs if r["split"] == split and r["rule_version"] == active and r["system"] == "rules"]
-        if base and cand and active != "rules-v1.0":
+        if base and cand and active != config.BASELINE_RULE_VERSION:
             chk = monitoring.regression_check(base[-1], cand[-1])
             shown = True
             label = " (simulated degradation — fault-injection rule set)" if "fault" in active else " (synthetic evaluation data, not production drift)"
             if chk["alert"]:
-                st.error(f"**Quality alert · {pretty(split)} split** — active rules {active} vs baseline rules-v1.0: "
+                st.error(f"**Quality alert · {pretty(split)} split** — active rules {active} vs baseline {config.BASELINE_RULE_VERSION}: "
                          + "; ".join(f"{x['metric']} {x['baseline']:.0%} → {x['candidate']:.0%}" for x in chk["regressions"]) + label)
             else:
-                st.success(f"{pretty(split)} split: active rules {active} show no regression vs rules-v1.0{label}")
+                st.success(f"{pretty(split)} split: active rules {active} show no regression vs {config.BASELINE_RULE_VERSION}{label}")
     if not shown:
         st.caption(f"Quality gate: active rules **{active}** — no comparison needed or no comparable runs yet.")
 
@@ -61,6 +61,19 @@ def render() -> None:
          "This demo": _stat(m["time_to_recorded_simulated_containment"]["demo"]),
          "SLA breaches": f"{s['containment_breaches']} of {s['containment_evaluated']}"},
     ]), hide_index=True, use_container_width=True)
+
+    st.subheader("Automatic pauses (C7)")
+    h = m["auto_hold"]
+    st.caption("P0 CBRN and child-safety cases pause the reported session automatically; a person must confirm or lift the pause. "
+               "Simulated — nothing is paused in any real system.")
+    h1, h2, h3, h4 = st.columns(4)
+    h1.metric("Applied", h["applied"])
+    h2.metric("Awaiting a person", h["awaiting_review"], delta=f"{h['awaiting_review_overdue']} overdue" if h["awaiting_review_overdue"] else None,
+              delta_color="inverse")
+    h3.metric("Confirmed / lifted", f"{h['confirmed']} / {h['lifted']}")
+    ls = h["lifted_share_of_reviewed"]
+    h4.metric("Lifted share (false-alarm proxy)", f"{ls['value']:.0%}" if ls["value"] is not None else "—",
+              help=f"{ls['numerator']} of {ls['denominator']} reviewed pauses were lifted. {h['note']}")
 
     a, b = st.columns(2)
     with a:

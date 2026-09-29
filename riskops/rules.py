@@ -2,7 +2,8 @@
 
 Rule sets live in ``playbooks/rules_*.json`` and are human-readable. The engine:
 
-1. computes named boolean *signals* from structured intake fields and lexicon matches;
+1. computes named boolean *signals* from structured intake fields and lexicon matches, then
+   optional *derived signals* (named combinations, rules-v2.0+);
 2. evaluates ordered severity rules (first match wins, P0 rules first);
 3. derives potential impact and evidence quality **separately** from severity;
 4. derives risk categories, a primary route and involved teams;
@@ -25,7 +26,7 @@ from .schemas import SEVERITY_ORDER, IncidentIntake
 
 SYSTEM_EVIDENCE = {
     "conversation_excerpt", "tool_action_log", "file_diff", "approval_event", "telemetry",
-    "classifier_output", "account_settings", "reviewer_note",
+    "classifier_output", "account_settings", "reviewer_note", "restricted_evidence_ref",
 }
 KEY_FIELDS = [
     "file_action", "external_action_attempted", "user_approved", "sensitive_data",
@@ -128,6 +129,10 @@ def compute_signals(incident: IncidentIntake, rules: dict) -> tuple[dict[str, bo
         "safety_reviewer_report": i.reporter_channel == "safety_reviewer",
         "report_manipulation": bool(injection),
     })
+    # Derived signals (rules-v2.0+): named combinations of other signals, evaluated in order,
+    # e.g. "child_sexual" = a minor is mentioned AND sexual content is mentioned.
+    for name, cond in rules.get("derived_signals", {}).items():
+        signals[name] = matches(cond, signals)
     return signals, matched, injection
 
 
@@ -194,7 +199,7 @@ def evaluate(incident: IncidentIntake, version: str) -> RuleResult:
             severity = f["floor"]
             break
 
-    categories = [c["category"] for c in rules["category_rules"] if matches(c, signals)] or ["benign_noise"]
+    categories = list(dict.fromkeys(c["category"] for c in rules["category_rules"] if matches(c, signals))) or ["benign_noise"]
     route = rules["default_route"]
     for cat, r in rules["route_priority"]:
         if cat in categories:

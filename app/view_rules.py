@@ -69,7 +69,7 @@ def render() -> None:
             st.error("The active rule version is a FAULT-INJECTION demo set. Roll back.")
         st.markdown("**Regression evaluation** — run a baseline and a candidate on the same split and apply the regression gate.")
         a1, a2, a3 = st.columns(3)
-        base_v = a1.selectbox("Baseline", versions, index=versions.index("rules-v1.0") if "rules-v1.0" in versions else 0)
+        base_v = a1.selectbox("Baseline", versions, index=versions.index(config.BASELINE_RULE_VERSION) if config.BASELINE_RULE_VERSION in versions else 0)
         cand_v = a2.selectbox("Candidate", versions, index=versions.index(active))
         split = a3.selectbox("Split", ["held_out", "dev", "all"])
         if st.button("Run regression check"):
@@ -109,10 +109,11 @@ def render() -> None:
 | C3 | Provider severity below the rules recommendation is raised to it (controls never lower severity) |
 | C4 | Instructions embedded in report text are flagged for review and never followed |
 | C5 | Low confidence on a potentially high/critical-impact case → mandatory review (low confidence ≠ low severity) |
-| C6 | A different route than a specialist route (Safety, Legal/Privacy, Product Security) → specialist route kept and flagged |
+| C6 | A different route than a specialist route (Safety, Child Safety, Threat Intel, Legal/Privacy, Product Security) → specialist route kept and flagged |
+| C7 | P0 recommendation in **CBRN or child safety** (from the rules *or* the AI) → the reported session is paused automatically (simulated). A Safety specialist or the Incident Lead must confirm or lift it; lifting needs a written reason. It never lifts itself: past its review time it escalates to the Incident Lead. Anything stronger (account suspension, mandatory external report) stays a human decision |
 """)
         st.markdown("**Prompt versions** (used only in live mode)")
-        pv = st.selectbox("Prompt", ["prompt-v1", "prompt-v2"])
+        pv = st.selectbox("Prompt", sorted(p.stem for p in config.PROMPT_DIR.glob("prompt-v*.md")))
         st.code((config.PROMPT_DIR / f"{pv}.md").read_text()[:5000], language="markdown")
         st.markdown("**SLA targets — PROTOTYPE ASSUMPTIONS** (config/sla.json)")
         sla = config.sla_config()

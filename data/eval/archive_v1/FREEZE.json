@@ -1,0 +1,76 @@
+{
+  "frozen_at": "2026-09-28T02:37:27+00:00",
+  "held_out_case_ids": [
+    "EVAL-045",
+    "EVAL-046",
+    "EVAL-047",
+    "EVAL-048",
+    "EVAL-049",
+    "EVAL-050",
+    "EVAL-051",
+    "EVAL-052",
+    "EVAL-053",
+    "EVAL-054",
+    "EVAL-055",
+    "EVAL-056",
+    "EVAL-057",
+    "EVAL-058",
+    "EVAL-059",
+    "EVAL-060",
+    "EVAL-061",
+    "EVAL-062",
+    "EVAL-063",
+    "EVAL-064",
+    "EVAL-065",
+    "EVAL-066",
+    "EVAL-067",
+    "EVAL-068",
+    "EVAL-069",
+    "EVAL-070",
+    "EVAL-071",
+    "EVAL-072",
+    "EVAL-073",
+    "EVAL-074",
+    "EVAL-075",
+    "EVAL-076",
+    "EVAL-077",
+    "EVAL-078",
+    "EVAL-079",
+    "EVAL-080"
+  ],
+  "sha256_cases_and_labels": "d0276b5830232bfdc0cbe6d0f7d99712a38ee9f6052e92c5e3c2e4933234908d",
+  "rule_versions_existing_at_freeze": [
+    "rules-v1.0"
+  ],
+  "status": "untouched",
+  "statement": "Held-out cases and labels were frozen before any rule tuning. rules-v1.0 was written before any evaluation. Development failures only may guide rule changes. If held-out results are ever used to change rules, set status to 'used-for-tuning' and disclose it; the set is then no longer untouched.",
+  "disclosures": [
+    {
+      "date": "2026-09-28T02:43:26+00:00",
+      "previous_sha256": "dd083136af16d5514c61060ca71a57b4acdb5cfe8798a4b8a852767a28dbad08",
+      "change": "Rewrote 37 case titles (19 of them held-out) from analyst-summary wording to reporter-style wording because titles leaked the expected answer (e.g. 'embedded instruction', 'logs show no send'). Labels, evidence and all other fields unchanged.",
+      "trigger": "Noticed while debugging a rules-v1.0 DEVELOPMENT-set failure (EVAL-042 matched 'embedded instruction' in its title). No held-out evaluation had been run and rules-v1.1 did not yet exist."
+    }
+  ],
+  "refrozen_at": "2026-09-28T02:43:26+00:00",
+  "held_out_evaluations": [
+    {
+      "date": "2026-09-28",
+      "runs": [
+        "rules-v1.0 held_out",
+        "rules-v1.1 held_out"
+      ],
+      "used_for_tuning": false,
+      "note": "First held-out runs after rules-v1.1 was finalized on dev. rules-v1.1 regressed P0/P1 recall (EVAL-048). No rule changes were made from these results."
+    },
+    {
+      "date": "2026-09-28",
+      "runs": [
+        "rules-v1.0 held_out",
+        "rules-v1.1 held_out"
+      ],
+      "used_for_tuning": false,
+      "note": "Re-run with controls-v1.1 (transcript role-label false-positive fix, motivated by seeded demo case INC-1001, not by held-out results). Change on held-out: EVAL-066 is no longer flagged for review - its earlier flag was an accidental C4 false positive. No rules were changed."
+    }
+  ]
+}

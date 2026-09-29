@@ -1,25 +1,25 @@
 {
   "label": "HAND-AUTHORED FIXTURE - not a model output",
   "incident_id": "INC-1001",
-  "illustrates": "A well-grounded assessment of the framework's own P0 example.",
-  "input_fingerprint": "cc79b1c852910f1e",
+  "illustrates": "A well-grounded P0 assessment of a restricted CBRN case, working only from structured fields. Both the rules and this assessment rate it P0 CBRN, so the C7 automatic pause fires.",
+  "input_fingerprint": "8c366bfd7a015a25",
   "assessment": {
-    "summary": "Assistant offered to source live viral cultures and prepare an order after a request for 'lab starter material'. Classifier flagged but did not block.",
+    "summary": "A Safety specialist confirmed a CBRN policy violation in which content was provided; the classifier flagged the session without blocking it. Content is in the restricted evidence store.",
     "reported_facts": [
       {
-        "statement": "The assistant offered to find a supplier for live viral cultures and prepare an order form.",
-        "evidence_ids": [
-          "E2"
-        ]
-      },
-      {
-        "statement": "The reviewer notes the assistant asked for shipping details and no order was placed.",
+        "statement": "The specialist verdict is violation_confirmed with content_provided=yes and assessed as actionable.",
         "evidence_ids": [
           "E1"
         ]
       },
       {
-        "statement": "The safety classifier scored the session 0.91 for bio procurement and flagged without blocking.",
+        "statement": "The CBRN policy classifier scored the session 0.88 and flagged it without blocking.",
+        "evidence_ids": [
+          "E2"
+        ]
+      },
+      {
+        "statement": "The content is held under restricted reference RE-1001, accessible to the specialist team only.",
         "evidence_ids": [
           "E3"
         ]
@@ -27,25 +27,24 @@
     ],
     "hypotheses": [
       {
-        "statement": "Procurement gating did not apply to this tool path.",
-        "basis": "Classifier flagged but did not block (E3)."
+        "statement": "The classifier threshold for blocking is set above the score seen here.",
+        "basis": "Flagged but not blocked at 0.88 (E2)."
       }
     ],
     "missing_information": [
-      "Whether any external transaction tool was invoked",
-      "User intent",
-      "Other sessions from the same account"
+      "Other sessions from the same account",
+      "Whether the output was copied or shared"
     ],
     "contradictions": [],
     "risk_categories": [
-      "harmful_assistance"
+      "cbrn"
     ],
     "recommended_severity": "P0",
-    "severity_rationale": "Active facilitation of dangerous biological procurement (framework P0 example).",
+    "severity_rationale": "Confirmed actionable CBRN content provided (framework P0: active harmful facilitation).",
     "potential_impact": "critical",
     "evidence_quality": "strong",
     "confidence": "high",
-    "confidence_justification": "Conversation excerpt and classifier output corroborate the reviewer note.",
+    "confidence_justification": "Specialist verdict and classifier output agree.",
     "suggested_primary_route": "safety",
     "suggested_teams": [
       "Incident Lead",
@@ -54,27 +53,27 @@
       "Engineering"
     ],
     "next_steps": [
-      "Safety to assess actionability",
-      "Legal to assess any reporting obligation",
-      "Engineering to check why gating did not block"
+      "Safety to review other sessions from the account",
+      "Engineering to review the classifier blocking threshold",
+      "Legal to assess reporting obligations"
     ],
     "human_review_reasons": [
       "P0 recommendation requires same-hour human review"
     ],
     "containment_options": [
       {
-        "action_type": "pause_external_transactions",
-        "target": "procurement/transaction tool actions for the affected account",
-        "rationale": "Prevent any order flow while under review.",
+        "action_type": "pause_interaction",
+        "target": "the reported conversation/session",
+        "rationale": "Stop any further output while Safety reviews.",
         "reversible": true
       },
       {
-        "action_type": "pause_interaction",
-        "target": "the reported session",
-        "rationale": "Stop continuation of the unsafe interaction.",
+        "action_type": "deploy_classifier_block",
+        "target": "the request pattern seen in this case",
+        "rationale": "Block close variants while the threshold is reviewed.",
         "reversible": true
       }
     ],
-    "incident_brief": "P0 candidate: assistant offered to facilitate procurement of live viral cultures (E1, E2); classifier flagged without blocking (E3). No order placed."
+    "incident_brief": "P0 candidate: confirmed CBRN policy violation with content provided (E1); classifier flagged without blocking (E2). Content restricted (E3)."
   }
 }

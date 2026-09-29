@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS containment_actions (
     rationale TEXT NOT NULL,
     reversible INTEGER NOT NULL,
     proposed_by TEXT NOT NULL,
-    proposed_source TEXT NOT NULL,     -- ai | rules | human
+    proposed_source TEXT NOT NULL,     -- ai | human | auto_hold (C7, applied without prior approval)
     proposed_at TEXT NOT NULL,
     status TEXT NOT NULL,              -- proposed | rejected | active | reversed | expired
     decided_by TEXT,
@@ -109,7 +109,10 @@ CREATE TABLE IF NOT EXISTS containment_actions (
     ended_at TEXT,
     ended_by TEXT,
     end_reason TEXT,
-    simulated INTEGER NOT NULL DEFAULT 1
+    simulated INTEGER NOT NULL DEFAULT 1,
+    hold_review_outcome TEXT,          -- C7 auto-hold only: confirmed | lifted (NULL = awaiting a person)
+    hold_reviewed_by TEXT,
+    hold_reviewed_at TEXT
 );
 CREATE TABLE IF NOT EXISTS communications (
     comm_id TEXT NOT NULL,
@@ -166,8 +169,8 @@ CREATE TABLE IF NOT EXISTS eval_runs (
 """
 
 DEFAULT_SETTINGS = {
-    "active_rule_version": "rules-v1.0",
-    "active_prompt_version": "prompt-v1",
+    "active_rule_version": "rules-v2.0",
+    "active_prompt_version": "prompt-v3",
     "provider_mode": "offline",
     "quality_baseline_run_id": "",
 }

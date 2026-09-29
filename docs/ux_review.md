@@ -68,6 +68,6 @@ The first interface worked, but it was organized around *data* (one tab per tabl
 
 ## Verification
 
-* `scripts/ui_walkthrough.py` drives the seven-step demo through the redesigned interface in headless Chromium. It asserts that **Risk Ops cannot approve P0 containment** and that **the Incident Lead cannot approve a draft flagged for Legal/Privacy** (both controls are disabled). It produced `docs/screenshots/01–12`.
+* `scripts/ui_walkthrough.py` drives the demo through the redesigned interface in headless Chromium. It asserts that **a Safety specialist can confirm an automatic pause**, that **Risk Ops cannot approve P0 containment**, and that **the Incident Lead cannot approve a draft flagged for Legal/Privacy** (both controls are disabled). It produced `docs/screenshots/01–13`.
 * `scripts/ui_smoke.py` opens every page and every case section and checks that none raises an exception.
 * `tests/test_workflow.py::test_next_actions_guide_by_status_and_role` and `::test_closure_blockers_match_close_incident_checks` cover the new guidance services.

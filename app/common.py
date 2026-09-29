@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 import json
 import os
 import sys
@@ -22,6 +23,7 @@ from riskops import config  # noqa: E402
 from riskops import workflow as wf  # noqa: E402
 from riskops.db import connect, get_setting  # noqa: E402
 from riskops.providers import get_provider  # noqa: E402
+from riskops.schemas import TEAMS as SCHEMA_TEAMS  # noqa: E402
 
 # --------------------------------------------------------------------------- labels
 
@@ -33,13 +35,27 @@ STATUS_LABEL = {
 STAGES = ["Intake", "AI enrichment", "Triage", "Investigation", "Containment", "Response", "Closure", "QA"]
 STATUS_STAGE = {"NEW": 0, "ASSESSED": 1, "ASSESSMENT_FAILED": 1, "TRIAGED": 2, "REOPENED": 2, "INVESTIGATING": 3,
                 "CONTAINMENT": 4, "RESPONSE": 5, "CLOSED": 6, "QA_REVIEWED": 7}
-ROUTE_LABEL = {"safety": "Safety", "legal_privacy": "Legal/Privacy", "product_security": "Product Security",
-               "product_engineering": "Product/Engineering", "product_ux": "Product/UX", "support": "Support", "risk_ops": "Risk Ops"}
+ROUTE_LABEL = {"safety": "Safety", "child_safety": "Child Safety", "threat_intel": "Threat Intel",
+               "product_security": "Product Security", "legal_privacy": "Legal/Privacy", "model_behavior": "Model Behavior",
+               "product_engineering": "Product/Engineering", "product_ux": "Product/UX", "risk_ops": "Risk Ops", "support": "Support"}
 CATEGORY_LABEL = {
-    "harmful_assistance": "Harmful assistance", "sensitive_data": "Sensitive data", "prompt_injection": "Prompt injection",
-    "unintended_action": "Unintended action", "file_modification": "File modification", "approval_ux": "Approval / UX",
-    "synthetic_media": "Synthetic media", "inaccurate_output": "Inaccurate output", "product_failure": "Product failure",
-    "containment_appeal": "Containment appeal", "benign_noise": "Benign / noise",
+    "cbrn": "CBRN weapons uplift", "cyber_misuse": "Cyber offense",
+    "child_safety": "Child safety", "self_harm": "Self-harm & suicide", "violent_extremism": "Violent extremism & threats",
+    "deepfake_ncii": "Deepfake / NCII", "influence_operations": "Influence operations", "fraud_scams": "Fraud & scams",
+    "safeguard_bypass": "Jailbreak / safeguard bypass", "enterprise_data_leakage": "Enterprise data leakage",
+    "privacy_pii": "Privacy / PII exposure", "prompt_injection": "Prompt injection & agent hijacking",
+    "model_security": "Model / secret leakage", "agentic_overreach": "Agentic overreach",
+    "harmful_inaccuracy": "Harmful inaccuracy", "bias_discrimination": "Bias & discrimination",
+    "enforcement_appeal": "Over-refusal / enforcement appeal", "product_failure": "Product failure", "benign_noise": "Benign / no issue",
+}
+CONTAINMENT_LABEL = {
+    "pause_interaction": "Pause the session", "restrict_tool_action": "Restrict a tool action",
+    "require_confirmation_destructive": "Require confirmation for destructive actions",
+    "warn_sensitive_file_access": "Warn on sensitive file access", "isolate_untrusted_instructions": "Isolate untrusted instructions",
+    "pause_external_transactions": "Pause external transactions", "workspace_safe_mode": "Workspace safe mode",
+    "disable_connector": "Disable a connector", "rotate_credentials": "Rotate exposed credentials (irreversible)",
+    "deploy_classifier_block": "Deploy a classifier block rule", "rate_limit_accounts": "Rate-limit accounts",
+    "account_lockout": "Suspend account (irreversible)", "file_mandatory_report": "Prepare mandatory external report (irreversible)",
 }
 SOURCE_LABEL = {
     "offline_fixture": ("Offline fixture · not a model", "b-fixture"),
@@ -57,6 +73,7 @@ CONTROL_TEXT = {
     "C4": "Report text contains instructions aimed at the reviewer (ignored)",
     "C5": "High potential impact but low confidence",
     "C6": "Specialist route kept",
+    "C7": "Session paused automatically (P0 CBRN / child safety) — a person must confirm or lift",
 }
 FIELD_LABEL = {
     "product_surface": "Product surface", "customer_type": "Customer", "reporter_channel": "Channel",
@@ -64,10 +81,10 @@ FIELD_LABEL = {
     "user_approved": "User approved", "sensitive_data": "Sensitive data", "scope": "Scope", "recurrence": "Recurrence",
     "reversibility": "Reversibility",
 }
-TEAMS = ["Incident Lead", "Risk Ops", "Safety", "Support", "Engineering", "Product Security", "Product/UX",
-         "Legal/Privacy", "Enterprise/CS", "Data/Analytics"]
+TEAMS = SCHEMA_TEAMS
 EVIDENCE_TYPES = ["reporter_statement", "conversation_excerpt", "tool_action_log", "file_diff", "approval_event",
-                  "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note"]
+                  "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note",
+                  "restricted_evidence_ref"]
 ACTORS = {a.actor_id: a for a in wf.SIMULATED_ACTORS}
 
 
@@ -75,10 +92,17 @@ def pretty(v) -> str:
     return str(v).replace("_", " ")
 
 
+def action_label(t: str) -> str:
+    return CONTAINMENT_LABEL.get(t, pretty(t))
+
+
 def humanize(text: str) -> str:
     """Replace internal route keys in explanatory text with their display names."""
+    # Only underscore keys (e.g. legal_privacy, child_safety): plain words such as "safety" or
+    # "support" are ordinary English in sentences and must not be capitalised.
     for k, v in ROUTE_LABEL.items():
-        text = text.replace(k, v)
+        if "_" in k:
+            text = re.sub(rf"(?<![\w]){re.escape(k)}(?![\w])", v, text)
     return text
 
 
@@ -321,7 +345,12 @@ def describe_event(e: dict) -> str:
     if t == "evidence_added":
         return f"{who} added evidence <b>{esc(new)}</b> ({pretty(details.get('source_type'))})"
     if t == "containment_proposed":
-        return f"{who} proposed containment <b>{pretty(nv['action_type'])}</b> on {esc(nv['target'])} [simulated]"
+        return f"{who} proposed containment <b>{action_label(nv['action_type'])}</b> on {esc(nv['target'])} [simulated]"
+    if t == "auto_hold_applied":
+        return (f"<b>⏸ C7 automatic pause</b> applied to {esc(pretty(details.get('action_type', '')))} — {esc(e['reason'] or '')}"
+                f" [simulated · awaiting human review]")
+    if t in ("auto_hold_confirmed", "auto_hold_lifted"):
+        return f"{who} <b>{'confirmed' if t.endswith('confirmed') else 'lifted'}</b> the automatic pause [simulated]{reason}"
     if t in ("containment_approved", "containment_rejected", "containment_reversed", "containment_expired"):
         verb = t.split("_")[1]
         return f"{who} {verb} containment {esc(e['field'].split(':')[1])} [simulated]{reason}"

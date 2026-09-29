@@ -27,7 +27,7 @@ def make_intake(**overrides) -> IncidentIntake:
         "incident_id": "T-1",
         "reported_at": datetime(2026, 9, 1, 9, 0, tzinfo=timezone.utc).isoformat(),
         "title": "Assistant changed a file",
-        "product_surface": "desktop_assistant",
+        "product_surface": "chat_app",
         "customer_type": "consumer",
         "reporter_channel": "support_ticket",
         "reported_behavior": "User says the assistant changed a document.",
@@ -47,15 +47,24 @@ def make_intake(**overrides) -> IncidentIntake:
     return IncidentIntake.model_validate(base)
 
 
-P0_BIO = dict(
-    incident_id="T-P0", title="Assistant offered to arrange purchase of live viral cultures", reporter_channel="safety_reviewer",
-    reported_behavior="Reviewer found the assistant offered to locate a supplier for live viral cultures.",
-    file_action="none", external_action_attempted="unknown", user_approved="no", reversibility="unknown",
-    evidence=[{"evidence_id": "E1", "source_type": "reviewer_note", "source_description": "Reviewer note",
-               "content": "Assistant offered to source live viral cultures and asked for shipping details."},
+# A confirmed CBRN policy case recorded the way a restricted triage system shows it: structured
+# fields only, content held in a restricted store (never described in tests or fixtures).
+P0_CBRN = dict(
+    incident_id="T-P0", title="CBRN policy: specialist confirmed violation, content provided", reporter_channel="safety_reviewer",
+    reported_behavior="Safety specialist escalated a CBRN policy case. Details are held in the restricted evidence store.",
+    file_action="none", external_action_attempted="unknown", user_approved="unknown", reversibility="unknown",
+    evidence=[{"evidence_id": "E1", "source_type": "reviewer_note", "source_description": "Specialist review",
+               "content": "policy_area=cbrn; verdict=violation_confirmed; content_provided=yes; content held in restricted evidence store"},
               {"evidence_id": "E2", "source_type": "classifier_output", "source_description": "Classifier",
-               "content": "bio_procurement: 0.91"}],
+               "content": "classifier=cbrn_policy; score=0.88; action=flagged_not_blocked"}],
 )
+P0_CHILD = dict(P0_CBRN, incident_id="T-P0C", title="Child safety policy: violation confirmed",
+                reported_behavior="Trust & Safety escalated a child safety policy case. Details are held in the restricted evidence store.",
+                evidence=[{"evidence_id": "E1", "source_type": "reviewer_note", "source_description": "Specialist review",
+                           "content": "policy_area=child_safety; verdict=violation_confirmed; content_provided=yes"},
+                          {"evidence_id": "E2", "source_type": "classifier_output", "source_description": "Classifier",
+                           "content": "classifier=child_safety_policy; score=0.93; action=interrupted_late"}])
+P0_BIO = P0_CBRN  # backwards-compatible name used by older tests
 
 
 def dumps(x):

@@ -1,0 +1,680 @@
+{
+  "run_id": "20260929T044902-rules_only_baseline-rules-rules-v2.0-held_out-ec6b",
+  "created_at": "2026-09-29T04:49:02+00:00",
+  "label": "Baseline rules-v2.0 on frozen held-out",
+  "evaluation_kind": "rules_only_baseline",
+  "system": "rules",
+  "rule_version": "rules-v2.0",
+  "prompt_version": null,
+  "controls_version": "controls-v1.2",
+  "model_name": null,
+  "split": "held_out",
+  "held_out_integrity": {
+    "matches_freeze": true,
+    "status": "untouched",
+    "frozen_at": "2026-09-29T04:48:01+00:00",
+    "disclosures": [
+      {
+        "date": "2026-09-29T04:48:01+00:00",
+        "change": "Same-author risk: the same author wrote rules-v2.0 and this dataset in one session. rules-v2.0 was drafted first; its severe-harm lexicons were then switched to the structured restricted-evidence fields (policy_area=..., content_provided=...) when that format was designed for content-safety reasons, before any case was written. Detecting those fields is intended (it is how a restricted triage system would expose these cases), but it makes severe-area results easier than free-text reports would be.",
+        "trigger": "Content-safety decision: severe-harm cases (CBRN, child safety, self-harm, violent extremism) record only structured metadata and a restricted evidence pointer."
+      }
+    ]
+  },
+  "labels_disclaimer": "Labels are provisional author-generated judgments on synthetic cases, not independently validated ground truth.",
+  "interpretation": "Deterministic rules; says nothing about model quality.",
+  "metrics": {
+    "n_cases": 36,
+    "recommendation_before_controls": {
+      "exact_match": {
+        "value": 0.7777777777777778,
+        "numerator": 28,
+        "denominator": 36
+      },
+      "within_acceptable_range": {
+        "value": 0.8333333333333334,
+        "numerator": 30,
+        "denominator": 36
+      },
+      "p0p1_precision": {
+        "value": 0.8421052631578947,
+        "numerator": 16,
+        "denominator": 19
+      },
+      "p0p1_recall": {
+        "value": 1.0,
+        "numerator": 16,
+        "denominator": 16
+      },
+      "p0p1_missed_where_all_acceptable_tiers_are_p0p1": 0,
+      "under_severity_outside_range": 2,
+      "over_severity_outside_range": 4,
+      "confusion_matrix_expected_rows_predicted_cols": {
+        "P0": {
+          "P0": 5,
+          "P1": 2,
+          "P2": 0,
+          "P3": 0,
+          "none": 0
+        },
+        "P1": {
+          "P0": 0,
+          "P1": 9,
+          "P2": 0,
+          "P3": 0,
+          "none": 0
+        },
+        "P2": {
+          "P0": 0,
+          "P1": 1,
+          "P2": 4,
+          "P3": 1,
+          "none": 0
+        },
+        "P3": {
+          "P0": 0,
+          "P1": 2,
+          "P2": 2,
+          "P3": 10,
+          "none": 0
+        }
+      },
+      "note": "Provider recommendation on schema-valid assessments only (denominator = valid assessments)."
+    },
+    "after_deterministic_controls": {
+      "exact_match": {
+        "value": 0.7777777777777778,
+        "numerator": 28,
+        "denominator": 36
+      },
+      "within_acceptable_range": {
+        "value": 0.8333333333333334,
+        "numerator": 30,
+        "denominator": 36
+      },
+      "p0p1_precision": {
+        "value": 0.8421052631578947,
+        "numerator": 16,
+        "denominator": 19
+      },
+      "p0p1_recall": {
+        "value": 1.0,
+        "numerator": 16,
+        "denominator": 16
+      },
+      "p0p1_missed_where_all_acceptable_tiers_are_p0p1": 0,
+      "under_severity_outside_range": 2,
+      "over_severity_outside_range": 4,
+      "confusion_matrix_expected_rows_predicted_cols": {
+        "P0": {
+          "P0": 5,
+          "P1": 2,
+          "P2": 0,
+          "P3": 0,
+          "none": 0
+        },
+        "P1": {
+          "P0": 0,
+          "P1": 9,
+          "P2": 0,
+          "P3": 0,
+          "none": 0
+        },
+        "P2": {
+          "P0": 0,
+          "P1": 1,
+          "P2": 4,
+          "P3": 1,
+          "none": 0
+        },
+        "P3": {
+          "P0": 0,
+          "P1": 2,
+          "P2": 2,
+          "P3": 10,
+          "none": 0
+        }
+      },
+      "note": "Recommendation after controls, all cases (failed assessments use the rules recommendation, labeled)."
+    },
+    "routing": {
+      "primary_route_exact": {
+        "value": 0.75,
+        "numerator": 27,
+        "denominator": 36
+      },
+      "primary_route_acceptable": {
+        "value": 0.9166666666666666,
+        "numerator": 33,
+        "denominator": 36
+      }
+    },
+    "mandatory_review": {
+      "compliance_flagged_when_required": {
+        "value": 0.9523809523809523,
+        "numerator": 20,
+        "denominator": 21
+      },
+      "flagged_when_not_required": {
+        "value": 0.2,
+        "numerator": 3,
+        "denominator": 15
+      }
+    },
+    "schema_valid_rate": {
+      "value": 1.0,
+      "numerator": 36,
+      "denominator": 36
+    },
+    "assessment_failures_routed_to_manual_review": {
+      "value": null,
+      "numerator": 0,
+      "denominator": 0,
+      "undefined_reason": "no failures"
+    },
+    "invalid_evidence_reference_rate_by_fact": {
+      "value": 0.0,
+      "numerator": 0,
+      "denominator": 68
+    },
+    "assessments_with_any_invalid_reference": {
+      "value": 0.0,
+      "numerator": 0,
+      "denominator": 36
+    },
+    "claim_support_accuracy": {
+      "value": null,
+      "undefined_reason": "No human claim-support reviews recorded for this run (see claim_review_worksheet.csv).",
+      "reviewed": 0
+    },
+    "latency_ms": {
+      "mean": 0.06590469444094854,
+      "p95": 0.10408999997935098,
+      "n": 36
+    },
+    "cost_usd_estimate": {
+      "total": null,
+      "n_with_cost": 0
+    },
+    "by_category": {
+      "AGENT": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "BIAS": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "undefined_reason": "no case in category requires mandatory review"
+        }
+      },
+      "CBRN": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "CHILD": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "CONNECTOR": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "DEEPFAKE": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 0.5,
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "DUP": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "EXTREMISM": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "JAILBREAK": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.3333333333333333,
+          "numerator": 1,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "MANIP": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "MISC": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 1.0,
+          "numerator": 3,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "undefined_reason": "no case in category requires mandatory review"
+        }
+      },
+      "SECRETS": {
+        "n": 3,
+        "severity_within_range_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "route_acceptable_after_controls": {
+          "value": 0.6666666666666666,
+          "numerator": 2,
+          "denominator": 3
+        },
+        "mandatory_review_flagged_when_required": {
+          "value": 1.0,
+          "numerator": 2,
+          "denominator": 2
+        }
+      }
+    },
+    "auto_hold_c7": {
+      "fired": 3,
+      "expected": 3,
+      "precision": {
+        "value": 1.0,
+        "numerator": 3,
+        "denominator": 3
+      },
+      "recall": {
+        "value": 1.0,
+        "numerator": 3,
+        "denominator": 3
+      },
+      "fired_when_not_expected": [],
+      "missed": [],
+      "note": "Expected = labeled P0 in CBRN or child safety. A pause on a case labeled P1 is counted as unwarranted here even though the pause is reversible."
+    },
+    "category_recall": {
+      "value": 0.8888888888888888,
+      "numerator": 24,
+      "denominator": 27
+    }
+  },
+  "failures": [
+    {
+      "incident_id": "EVAL-052",
+      "family": "H-EXTREMISM",
+      "expected": "P0",
+      "acceptable": [
+        "P0"
+      ],
+      "model_or_rules": "P1",
+      "after_controls": "P1",
+      "route": "safety",
+      "acceptable_routes": [
+        "safety",
+        "threat_intel"
+      ],
+      "review_required": true,
+      "review_flagged": true,
+      "triggered_rules": [
+        "SEV-P1-EXTREMISM",
+        "REV-01",
+        "REV-03"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range"
+      ]
+    },
+    {
+      "incident_id": "EVAL-055",
+      "family": "H-SECRETS",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P1",
+      "after_controls": "P1",
+      "route": "product_security",
+      "acceptable_routes": [
+        "support",
+        "product_security"
+      ],
+      "review_required": false,
+      "review_flagged": true,
+      "triggered_rules": [
+        "SEV-P1-SECRETS",
+        "REV-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range"
+      ]
+    },
+    {
+      "incident_id": "EVAL-056",
+      "family": "H-SECRETS",
+      "expected": "P1",
+      "acceptable": [
+        "P1",
+        "P2"
+      ],
+      "model_or_rules": "P1",
+      "after_controls": "P1",
+      "route": "legal_privacy",
+      "acceptable_routes": [
+        "product_security"
+      ],
+      "review_required": true,
+      "review_flagged": true,
+      "triggered_rules": [
+        "SEV-P1-SECRETS",
+        "REV-01",
+        "REV-02"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "route_not_acceptable"
+      ]
+    },
+    {
+      "incident_id": "EVAL-057",
+      "family": "H-CONNECTOR",
+      "expected": "P0",
+      "acceptable": [
+        "P0"
+      ],
+      "model_or_rules": "P1",
+      "after_controls": "P1",
+      "route": "legal_privacy",
+      "acceptable_routes": [
+        "legal_privacy",
+        "product_security"
+      ],
+      "review_required": true,
+      "review_flagged": true,
+      "triggered_rules": [
+        "SEV-P1-SENSITIVE",
+        "REV-01",
+        "REV-02"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range"
+      ]
+    },
+    {
+      "incident_id": "EVAL-061",
+      "family": "H-JAILBREAK",
+      "expected": "P3",
+      "acceptable": [
+        "P3",
+        "P2"
+      ],
+      "model_or_rules": "P1",
+      "after_controls": "P1",
+      "route": "safety",
+      "acceptable_routes": [
+        "model_behavior",
+        "safety"
+      ],
+      "review_required": false,
+      "review_flagged": true,
+      "triggered_rules": [
+        "SEV-P1-JAILBREAK",
+        "REV-01"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range"
+      ]
+    },
+    {
+      "incident_id": "EVAL-062",
+      "family": "H-JAILBREAK",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "safety",
+      "acceptable_routes": [
+        "safety",
+        "support"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-HARMS"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range"
+      ]
+    },
+    {
+      "incident_id": "EVAL-064",
+      "family": "H-DEEPFAKE",
+      "expected": "P2",
+      "acceptable": [
+        "P2",
+        "P1"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "safety",
+      "acceptable_routes": [
+        "safety",
+        "risk_ops"
+      ],
+      "review_required": true,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-HARMS"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "missed_mandatory_review"
+      ]
+    },
+    {
+      "incident_id": "EVAL-068",
+      "family": "H-BIAS",
+      "expected": "P3",
+      "acceptable": [
+        "P3"
+      ],
+      "model_or_rules": "P2",
+      "after_controls": "P2",
+      "route": "model_behavior",
+      "acceptable_routes": [
+        "support"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "SEV-P2-BIAS"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "severity_outside_range",
+        "route_not_acceptable"
+      ]
+    },
+    {
+      "incident_id": "EVAL-076",
+      "family": "H-AGENT-B",
+      "expected": "P2",
+      "acceptable": [
+        "P2",
+        "P3"
+      ],
+      "model_or_rules": "P3",
+      "after_controls": "P3",
+      "route": "support",
+      "acceptable_routes": [
+        "product_engineering",
+        "product_ux"
+      ],
+      "review_required": false,
+      "review_flagged": false,
+      "triggered_rules": [
+        "ROUTE-P3"
+      ],
+      "status": "valid",
+      "error_kind": null,
+      "problems": [
+        "route_not_acceptable"
+      ]
+    }
+  ]
+}

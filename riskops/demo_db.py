@@ -7,11 +7,12 @@ pair a new app/common.py with an older, already-imported copy of riskops.seed.
 from __future__ import annotations
 
 import os
+import sqlite3
 import threading
 import uuid
 from pathlib import Path
 
-from .seed import seed
+from .seed import DEMO_DATA_VERSION, seed
 
 
 _SEED_LOCK = threading.Lock()
@@ -34,13 +35,25 @@ def seed_atomic(path: str | Path) -> Path:
     return target
 
 
+def data_version(path: str | Path) -> str | None:
+    """Demo data version stored in an existing database (None if absent or unreadable)."""
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as c:
+            r = c.execute("SELECT value FROM settings WHERE key='demo_data_version'").fetchone()
+            return r[0] if r else None
+    except sqlite3.Error:
+        return None
+
+
 def ensure_seeded(path: str | Path) -> Path:
     """Seed ``path`` once, even if several sessions ask at the same moment (e.g. a hosted
-    app's first page load racing its health check)."""
+    app's first page load racing its health check). A database built from an older demo data
+    version (e.g. taxonomy v1) is rebuilt, because its schema and categories no longer match."""
     target = Path(path)
-    if target.exists():
+    if target.exists() and data_version(target) == DEMO_DATA_VERSION:
         return target
     with _SEED_LOCK:
-        if not target.exists():  # re-check: another thread may have finished meanwhile
+        # re-check: another thread may have finished meanwhile
+        if not (target.exists() and data_version(target) == DEMO_DATA_VERSION):
             seed_atomic(target)
     return target

@@ -17,7 +17,7 @@ SYS = wf.SYSTEM_ACTOR
 
 def _p0_case(conn, actors):
     wf.create_incident(conn, make_intake(**P0_BIO), actors["priya.safety"])
-    wf.run_assessment(conn, "T-P0", OfflineSimulationProvider(), rule_version="rules-v1.0")
+    wf.run_assessment(conn, "T-P0", OfflineSimulationProvider(), rule_version="rules-v2.0")
     return "T-P0"
 
 
@@ -72,7 +72,9 @@ def test_containment_expiry_and_reversal(conn, actors):
     now = datetime.now(timezone.utc)
     wf.decide_containment(conn, ca, actors["sam.lead"], True, "approve", review_by=now + timedelta(minutes=5), expires_at=now + timedelta(minutes=10))
     assert wf.expire_due_containment(conn, now + timedelta(minutes=11)) == 1
-    assert rows(conn, "SELECT status FROM containment_actions")[0]["status"] == "expired"
+    assert rows(conn, "SELECT status FROM containment_actions WHERE action_id=?", (ca,))[0]["status"] == "expired"
+    # the C7 automatic pause on this P0 CBRN case has no expiry: it never lifts itself
+    assert rows(conn, "SELECT status FROM containment_actions WHERE proposed_source='auto_hold'")[0]["status"] == "active"
     ca2 = wf.propose_containment(conn, iid, SYS, "pause_interaction", "session", "stop", source="ai")
     wf.decide_containment(conn, ca2, actors["sam.lead"], True, "approve")
     with pytest.raises(wf.PermissionDenied):
@@ -139,17 +141,17 @@ def test_reassessment_preserves_human_decision_and_history(conn, actors):
     wf.decide_severity(conn, iid, actors["alex.riskops"], "P1", "safety", ["Safety"], evidence_reviewed=["E1"],
                        reason="Offer was not actionable per E1", override_reason_code="policy_interpretation")
     first = wf.get_incident(conn, iid)["current_assessment_id"]
-    wf.run_assessment(conn, iid, FaultInjectionProvider("under_severity"), rule_version="rules-v1.1")
+    wf.run_assessment(conn, iid, FaultInjectionProvider("under_severity"), rule_version="rules-v2.1")
     inc = wf.get_incident(conn, iid)
     assert inc["human_severity"] == "P1" and inc["status"] == "TRIAGED"
     assert inc["current_assessment_id"] != first
     assert len(wf.list_assessments(conn, iid)) == 2  # earlier result kept
     assert rows(conn, "SELECT * FROM events WHERE event_type='ai_human_disagreement'")
     # a rule change does not touch incidents either
-    wf.change_rule_version(conn, "rules-v1.0", actors["sam.lead"], "Rollback for regression review")
+    wf.change_rule_version(conn, "rules-v2.0", actors["sam.lead"], "Rollback for regression review")
     assert wf.get_incident(conn, iid)["human_severity"] == "P1"
     with pytest.raises(wf.PermissionDenied):
-        wf.change_rule_version(conn, "rules-v1.1", actors["alex.riskops"], "try to change rules")
+        wf.change_rule_version(conn, "rules-v2.1", actors["alex.riskops"], "try to change rules")
 
 
 def test_failed_assessment_goes_to_manual_review_and_can_be_triaged(conn, actors):
@@ -172,7 +174,7 @@ def test_duplicate_linking_preserves_evidence_and_status(conn, actors):
                               {"evidence_id": "E2", "source_type": "reporter_statement", "source_description": "r", "content": "visible to all"}])
     for x in (a, b):
         wf.create_incident(conn, x, actors["casey.support"])
-        wf.run_assessment(conn, x.incident_id, OfflineProvider(), rule_version="rules-v1.1")
+        wf.run_assessment(conn, x.incident_id, OfflineProvider(), rule_version="rules-v2.1")
     sugg = dedup.suggest(wf.get_intake(conn, "D-1"), [wf.get_intake(conn, "D-2")])
     assert sugg and "planning_2026.docx" in sugg[0]["explanation"]
     wf.record_link_suggestions(conn, "D-1", sugg)
@@ -189,7 +191,7 @@ def test_duplicate_linking_preserves_evidence_and_status(conn, actors):
 
 def test_new_evidence_reopens_closed_case(conn, actors):
     wf.create_incident(conn, make_intake(), actors["casey.support"])
-    wf.run_assessment(conn, "T-1", OfflineSimulationProvider(), rule_version="rules-v1.1")
+    wf.run_assessment(conn, "T-1", OfflineSimulationProvider(), rule_version="rules-v2.1")
     wf.decide_severity(conn, "T-1", actors["alex.riskops"], "P3", "support", ["Support"], reason="ok")
     wf.transition(conn, "T-1", "RESPONSE", actors["alex.riskops"])
     wf.close_incident(conn, "T-1", _closure("P3", closure_category="user_misunderstanding_no_defect"), actors["alex.riskops"])
@@ -240,7 +242,7 @@ def test_json_import_reports_invalid_records_without_partial_import(conn, actors
 
 def test_communication_edit_creates_version_and_resets_approval(conn, actors):
     wf.create_incident(conn, make_intake(), actors["casey.support"])
-    wf.run_assessment(conn, "T-1", OfflineSimulationProvider(), rule_version="rules-v1.1")
+    wf.run_assessment(conn, "T-1", OfflineSimulationProvider(), rule_version="rules-v2.1")
     cid = communications.generate(conn, "T-1", "handoff", SYS)
     assert wf.review_communication(conn, cid, actors["alex.riskops"], True) == "approved"
     wf.save_communication(conn, "T-1", "handoff", "edited body [E1]", ["E1"], [], actors["alex.riskops"], "human_edit", comm_id=cid)
@@ -266,6 +268,8 @@ def test_future_reported_at_is_rejected(conn, actors):
 def test_next_actions_guide_by_status_and_role(conn, actors):
     iid = _p0_case(conn, actors)
     acts = wf.next_actions(conn, iid)
+    assert acts[0]["title"].startswith("Confirm or lift the automatic pause") and acts[0]["urgent"]
+    acts = acts[1:]
     assert acts[0]["title"] == "Decide severity and routing" and acts[0]["urgent"]
     assert wf.actor_can_do(conn, actors["alex.riskops"], acts[0])
     assert not wf.actor_can_do(conn, actors["casey.support"], acts[0])
@@ -278,6 +282,9 @@ def test_next_actions_guide_by_status_and_role(conn, actors):
     wf.transition(conn, iid, "RESPONSE", actors["sam.lead"])
     close = [x for x in wf.next_actions(conn, iid) if x["title"].startswith("Close")][0]
     assert close["permission"] == "close_p0p1"
+    assert wf.closure_blockers(conn, iid) == ["An automatic pause (C7) has not been confirmed or lifted"]
+    hold = wf.pending_auto_holds(conn, iid)[0]["action_id"]
+    wf.review_auto_hold(conn, hold, actors["priya.safety"], True, "Specialist confirmed")
     assert wf.closure_blockers(conn, iid) == []  # active containment is acknowledged in the dialog, not a blocker
 
 
@@ -318,5 +325,83 @@ def test_concurrent_first_load_seeds_once_without_collision(tmp_path):
         t.join()
     assert not errors
     c = connect(target)
-    assert rows(c, "SELECT COUNT(*) n FROM incidents")[0]["n"] == 12
+    assert rows(c, "SELECT COUNT(*) n FROM incidents")[0]["n"] == 16
     assert not list(tmp_path.glob("*.tmp"))
+
+
+# --- C7 automatic pause ---------------------------------------------------------------------
+
+def test_auto_hold_fires_for_p0_cbrn_and_child_safety_only(conn, actors):
+    from .conftest import P0_CHILD
+    iid = _p0_case(conn, actors)
+    holds = wf.pending_auto_holds(conn, iid)
+    assert len(holds) == 1 and holds[0]["action_type"] == "pause_interaction" and holds[0]["expires_at"] is None
+    wf.create_incident(conn, make_intake(**P0_CHILD), actors["priya.safety"])
+    wf.run_assessment(conn, "T-P0C", OfflineSimulationProvider(), rule_version="rules-v2.1")
+    assert len(wf.pending_auto_holds(conn, "T-P0C")) == 1
+    # a P0 outside the two categories (cross-tenant data exposure) does not pause anything
+    wf.create_incident(conn, make_intake(incident_id="T-X", customer_type="enterprise", sensitive_data="yes", file_action="read",
+                                         evidence=[{"evidence_id": "E1", "source_type": "tool_action_log", "source_description": "log",
+                                                    "content": "returned another tenant's document (cross-tenant)"}]), actors["alex.riskops"])
+    rec = wf.run_assessment(conn, "T-X", OfflineSimulationProvider(), rule_version="rules-v2.1")
+    assert rec["controlled_severity"] == "P0" and not wf.pending_auto_holds(conn, "T-X")
+
+
+def test_auto_hold_is_idempotent_on_reassessment(conn, actors):
+    iid = _p0_case(conn, actors)
+    wf.run_assessment(conn, iid, OfflineSimulationProvider(), rule_version="rules-v2.1")
+    assert len(rows(conn, "SELECT 1 FROM containment_actions WHERE proposed_source='auto_hold'")) == 1
+
+
+def test_auto_hold_fires_even_when_the_ai_fails(conn, actors):
+    wf.create_incident(conn, make_intake(**P0_BIO), actors["priya.safety"])
+    rec = wf.run_assessment(conn, "T-P0", FaultInjectionProvider("timeout"), rule_version="rules-v2.1")
+    assert rec["status"] == "failed" and wf.pending_auto_holds(conn, "T-P0")
+
+
+def test_auto_hold_fires_when_the_ai_under_calls(conn, actors):
+    wf.create_incident(conn, make_intake(**P0_BIO), actors["priya.safety"])
+    rec = wf.run_assessment(conn, "T-P0", FaultInjectionProvider("under_severity"), rule_version="rules-v2.1")
+    assert rec["model_severity"] != "P0" and rec["controlled_severity"] == "P0" and wf.pending_auto_holds(conn, "T-P0")
+
+
+def test_auto_hold_review_permissions_and_reasons(conn, actors):
+    iid = _p0_case(conn, actors)
+    hold = wf.pending_auto_holds(conn, iid)[0]["action_id"]
+    with pytest.raises(wf.PermissionDenied):
+        wf.review_auto_hold(conn, hold, actors["alex.riskops"], False, "Looks like a false alarm to me, lifting")
+    with pytest.raises(wf.WorkflowError):
+        wf.end_containment(conn, hold, actors["sam.lead"], "bypass the review")  # must go through confirm/lift
+    with pytest.raises(wf.WorkflowError):
+        wf.review_auto_hold(conn, hold, actors["sam.lead"], False, "too short")  # lifting needs 20+ characters
+    wf.review_auto_hold(conn, hold, actors["sam.lead"], False, "Specialist verdict reversed on appeal; not a violation.")
+    act = rows(conn, "SELECT * FROM containment_actions WHERE action_id=?", (hold,))[0]
+    assert act["status"] == "reversed" and act["hold_review_outcome"] == "lifted"
+    assert rows(conn, "SELECT 1 FROM events WHERE event_type='auto_hold_lifted'")
+    with pytest.raises(wf.WorkflowError):
+        wf.review_auto_hold(conn, hold, actors["sam.lead"], True, "again")
+
+
+def test_overdue_auto_hold_stays_on_and_escalates(conn, actors):
+    iid = _p0_case(conn, actors)
+    hold = wf.pending_auto_holds(conn, iid)[0]
+    assert wf.expire_due_containment(conn, datetime.now(timezone.utc) + timedelta(days=30)) == 0
+    conn.execute("UPDATE containment_actions SET review_by=? WHERE action_id=?",
+                 ((datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(timespec="seconds"), hold["action_id"]))
+    first = wf.next_actions(conn, iid)[0]
+    assert "OVERDUE" in first["title"] and "Incident Lead" in first["title"]
+    from riskops import monitoring
+    assert monitoring.ops_metrics(conn)["auto_hold"]["awaiting_review_overdue"] == 1
+
+
+def test_old_demo_database_is_rebuilt(tmp_path):
+    import sqlite3 as sq
+    from riskops.demo_db import ensure_seeded
+    from riskops.seed import DEMO_DATA_VERSION
+    old = tmp_path / "old.db"
+    with sq.connect(old) as c:
+        c.execute("CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT)")
+        c.execute("INSERT INTO settings VALUES ('demo_data_version', 'demo-v1')")
+    ensure_seeded(old)
+    c = connect(old)
+    assert rows(c, "SELECT value FROM settings WHERE key='demo_data_version'")[0]["value"] == DEMO_DATA_VERSION
