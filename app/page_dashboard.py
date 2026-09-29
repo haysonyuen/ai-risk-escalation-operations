@@ -82,12 +82,21 @@ def render() -> None:
         st.markdown(f"**{o['overrides']}** of **{o['decisions_with_ai_recommendation']}** decisions overrode the AI recommendation")
         st.dataframe(pd.DataFrame([{"Override reason": pretty(k), "Count": v} for k, v in o["by_reason"].items()] or [{"Override reason": "none", "Count": 0}]),
                      hide_index=True, use_container_width=True)
-        st.caption("Direction: " + (", ".join(f"{k} {v}" for k, v in o["by_direction"].items()) or "—"))
+        dir_label = {"raised": "severity raised", "lowered": "severity lowered", "route_only": "only the owning team changed"}
+        st.caption("Direction: " + (" · ".join(f"{dir_label.get(k, pretty(k))}: {v}" for k, v in o["by_direction"].items()) or "—"))
     with b:
         st.subheader("Issue categories")
         st.caption("Counts only — there is no usage denominator, so no recurrence rates.")
-        st.dataframe(pd.DataFrame([{"Category": CATEGORY_LABEL.get(k, k), "Cases": v} for k, v in sorted(m["category_counts"].items(), key=lambda x: -x[1])]),
-                     hide_index=True, use_container_width=True)
+        cats = pd.DataFrame([{"Category": CATEGORY_LABEL.get(k, k), "Cases": v} for k, v in m["category_counts"].items()])
+        if cats.empty:
+            st.info("No categorised cases yet.")
+        else:
+            import altair as alt
+            chart = (alt.Chart(cats).mark_bar(color="#d9473a", cornerRadiusEnd=3)
+                     .encode(x=alt.X("Cases:Q", axis=alt.Axis(tickMinStep=1, title="Cases")),
+                             y=alt.Y("Category:N", sort="-x", title=None, axis=alt.Axis(labelLimit=260)), tooltip=["Category", "Cases"])
+                     .properties(height=max(200, 26 * len(cats))))
+            st.altair_chart(chart, use_container_width=True)
 
     st.subheader("AI assessment health")
     f1, f2 = st.columns(2)

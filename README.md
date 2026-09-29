@@ -42,9 +42,10 @@ Everything runs offline. For the optional live model mode, copy `.env.example` t
 
 ### Using the interface
 
-* **Queue** (home page): the cases that need action, most urgent first. Click a row to open it. The **Filters** popover narrows by severity, category, owner or review flag.
+* **Start here**: the queue opens with a short tour. Each button opens a case that shows one idea (an automatic pause, AI vs. safety controls, a triage decision, a related report) and switches to the right role for you. **Hide** puts it away.
+* **Queue** (home page): the cases that need action, most urgent first, with colour-coded severity. Click a row to open it. The **Filters** popover narrows by severity, category, owner or review flag, and **How to read this** explains the symbols.
 * **Case**: the whole case on one screen.
-  * The **Next** panel says what the case needs and whether your role can do it.
+  * The **Next** panel says what the case needs and whether your role can do it. If it's someone else's step, one click (**Act as …**) switches to that role.
   * The left side is the case file: the report, the AI assessment with each claim shown beside the evidence it cites, evidence, activity, related reports and AI details.
   * The right side holds the actions: the severity and routing decision, owner and stage, containment, draft communications, and closure. Controls your role can't use are disabled, with the reason shown.
 * **New report**: a structured form, or JSON import.
