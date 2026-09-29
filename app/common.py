@@ -119,7 +119,7 @@ def actor_name(actor_id: str | None) -> str:
 
 CSS = """
 <style>
-.block-container{padding-top:2.2rem;max-width:1500px}
+.block-container{padding-top:4.2rem;max-width:1500px}
 h1{font-size:1.7rem!important} h2{font-size:1.35rem!important} h3{font-size:1.15rem!important} h4{font-size:1.02rem!important;margin-top:.4rem!important}
 .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.76rem;font-weight:600;margin:0 4px 2px 0;border:1px solid transparent;white-space:nowrap;vertical-align:middle}
 .b-p0{background:#fde2e1;color:#8a1c1c;border-color:#f3b4b1}.b-p1{background:#fdecd8;color:#8a4a0b;border-color:#f2c89a}
@@ -199,11 +199,12 @@ def ago(ts: str | None) -> str:
 
 def public_demo() -> bool:
     """Public demo mode: each browser session gets its own private, freshly seeded database.
-    Enable with RISKOPS_PUBLIC_DEMO=1 (env var or Streamlit secret)."""
-    if os.environ.get("RISKOPS_PUBLIC_DEMO") == "1":
+    Enable with RISKOPS_PUBLIC_DEMO=1 (or true/yes; env var or Streamlit secret)."""
+    on = {"1", "true", "yes", "on"}
+    if os.environ.get("RISKOPS_PUBLIC_DEMO", "").strip().lower() in on:
         return True
     try:
-        return str(st.secrets.get("RISKOPS_PUBLIC_DEMO", "")) == "1"
+        return str(st.secrets.get("RISKOPS_PUBLIC_DEMO", "")).strip().strip('"').lower() in on
     except Exception:  # no secrets file
         return False
 
