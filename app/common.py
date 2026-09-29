@@ -257,40 +257,6 @@ def current_actor() -> wf.Actor:
     return ACTORS[st.session_state.get("actor_id", "alex.riskops")]
 
 
-def _set_actor(actor_id: str) -> None:
-    # Runs as a widget callback, i.e. before the sidebar selectbox (key "actor_id") is drawn.
-    st.session_state["actor_id"] = actor_id
-    st.session_state.setdefault("_toasts", []).append(f"Now working as {ACTORS[actor_id].display.split(' (')[0]}")
-
-
-def actor_for(action: dict) -> wf.Actor | None:
-    """A simulated person who may take this next action (for one-click role switching)."""
-    able = [a for a in wf.SIMULATED_ACTORS
-            if (action["role"] and a.role == action["role"]) or (not action["role"] and wf.can(a, action["permission"]))]
-    # Prefer the specialist or analyst; the Incident Lead is the escalation point.
-    return next((a for a in able if a.role != "incident_lead"), able[0] if able else None)
-
-
-def switch_role_buttons(actions: list[dict], key: str) -> None:
-    """Offer one button per role that could act where the current role cannot."""
-    me = current_actor()
-    seen: list[str] = []
-    for x in actions:
-        if wf.actor_can_do(conn(), me, x):
-            continue
-        a = actor_for(x)
-        if a and a.actor_id not in seen and a.actor_id != me.actor_id:
-            seen.append(a.actor_id)
-    if not seen:
-        return
-    cols = st.columns([1.3] + [1.0] * len(seen) + [max(0.1, 5 - len(seen))], vertical_alignment="center")
-    cols[0].markdown("<span class='small'>Not your role? Switch:</span>", unsafe_allow_html=True)
-    for col, aid in zip(cols[1:], seen):
-        full = ACTORS[aid].display.split(" (")[0]
-        col.button(f"Act as {full.split(' —')[0]}", key=f"{key}_{aid}", on_click=_set_actor, args=(aid,),
-                   help=f"Switch the simulated identity to {full}", use_container_width=True)
-
-
 def provider_for_mode():
     mode = get_setting(conn(), "provider_mode")
     return get_provider(mode), mode

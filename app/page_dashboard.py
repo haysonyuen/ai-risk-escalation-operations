@@ -5,9 +5,63 @@ import json
 import pandas as pd
 import streamlit as st
 
-from common import CATEGORY_LABEL, conn, go, pretty
+from common import CATEGORY_LABEL, STAGES, STATUS_LABEL, STATUS_STAGE, actor_name, conn, go, go_case, pretty
 from riskops import config, monitoring
 from riskops.db import get_setting, rows
+
+
+SEV_COLORS = {"P0": "#c0392b", "P1": "#e67e22", "P2": "#d4ac0d", "P3": "#95a5a6"}
+
+
+def _stage_section() -> None:
+    """Where tickets are in the eight-stage workflow, by severity, with a stage filter and a case list."""
+    import altair as alt
+    st.subheader("Tickets by workflow stage")
+    q = monitoring.queue(conn())
+    picked = st.pills("Stages", STAGES, selection_mode="multi", default=STAGES, key="d_stages",
+                      help="Click to filter the chart and the list below by workflow stage") or []
+    f2, f3 = st.columns([3, 2], vertical_alignment="bottom")
+    with f2:
+        sevs = st.pills("Severity", ["P0", "P1", "P2", "P3"], selection_mode="multi", default=["P0", "P1", "P2", "P3"], key="d_sevs") or []
+    include_closed = f3.toggle("Include closed cases", value=True, key="d_closed", help="Closure and QA stages hold closed cases")
+    data = [{"Stage": STAGES[STATUS_STAGE[x["status"]]], "Order": STATUS_STAGE[x["status"]], "Severity": x["effective_severity"],
+             "x": x} for x in q
+            if STAGES[STATUS_STAGE[x["status"]]] in picked and x["effective_severity"] in sevs
+            and (include_closed or x["status"] in monitoring.OPEN)]
+    if not data:
+        st.info("No tickets match these filters.")
+        return
+    df = pd.DataFrame([{k: v for k, v in d.items() if k != "x"} for d in data])
+    counts = df.groupby(["Stage", "Order", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
+    order = [s for s in STAGES if s in picked]
+    chart = (alt.Chart(counts).mark_bar()
+             .encode(x=alt.X("Stage:N", sort=order, scale=alt.Scale(domain=order), title=None,
+                             axis=alt.Axis(labelAngle=0, labelLimit=120)),
+                     y=alt.Y("sum(Tickets):Q", title="Tickets", axis=alt.Axis(tickMinStep=1)),
+                     color=alt.Color("Severity:N", scale=alt.Scale(domain=list(SEV_COLORS), range=list(SEV_COLORS.values())),
+                                     legend=alt.Legend(orient="top", title=None)),
+                     order=alt.Order("Severity:N", sort="ascending"),
+                     tooltip=["Stage", "Severity", "Tickets"])
+             .properties(height=260))
+    st.altair_chart(chart, use_container_width=True)
+
+    items = [d["x"] for d in data]
+    table = pd.DataFrame([{
+        "ID": x["incident_id"], "Severity": x["effective_severity"] + (" ✓" if x["severity_basis"] == "human" else " · AI"),
+        "Stage": f"{STATUS_STAGE[x['status']] + 1} · {STAGES[STATUS_STAGE[x['status']]]}", "Status": STATUS_LABEL[x["status"]],
+        "Title": x["title"], "Age (h)": x["age_hours"], "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
+        "Next action": x["next_actions"][0]["title"] if x["next_actions"] else "—"} for x in sorted(
+            items, key=lambda x: (STATUS_STAGE[x["status"]], {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[x["effective_severity"]]))])
+    st.caption(f"{len(table)} ticket(s) in the selected stages · click a column header to sort · click a row to open the case")
+    ev = st.dataframe(table, hide_index=True, use_container_width=True, on_select="rerun", selection_mode="single-row",
+                      key=f"d_table_{st.session_state.get('d_nonce', 0)}", height=min(36 * (len(table) + 1) + 4, 420),
+                      column_config={"Age (h)": st.column_config.NumberColumn(format="%.1f", width=70),
+                                     "ID": st.column_config.TextColumn(width=78), "Severity": st.column_config.TextColumn(width=70),
+                                     "Title": st.column_config.TextColumn(width=260)})
+    sel = ev.selection.rows if ev and hasattr(ev, "selection") else []
+    if sel:
+        st.session_state["d_nonce"] = st.session_state.get("d_nonce", 0) + 1
+        go_case(table.iloc[sel[0]]["ID"])
 
 
 def _stat(d: dict) -> str:
@@ -50,6 +104,8 @@ def render() -> None:
         st.session_state["q_view"] = "All open"
         st.session_state["q_overdue"] = True
         go("queue")
+
+    _stage_section()
 
     st.subheader("Timeliness")
     s = m["sla"]
