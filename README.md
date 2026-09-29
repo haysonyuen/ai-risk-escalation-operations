@@ -18,10 +18,12 @@ All data is synthetic, and every AI output shown comes from a labeled offline fi
 
 | | |
 | --- | --- |
-| **Queue, most urgent first.** A P0 child-safety case sits on top with ⏸️: its session was paused automatically and is waiting for a person. Each severity shows whether it is an unconfirmed AI recommendation or human-confirmed. | **Automatic pause (C7), human decision.** For P0 CBRN or child-safety cases the session is paused at once; a Safety specialist or the Incident Lead must confirm or lift it. It never lifts itself. |
+| **Queue, most urgent first.** A P0 child-safety case sits on top with ⏸️: its session was paused automatically and is waiting for a person. Severity is colour-coded and shows whether it is an unconfirmed AI recommendation or human-confirmed. Filter by workflow stage and sort by urgency, severity, stage or age. | **Automatic pause (C7), human decision.** For P0 CBRN or child-safety cases the session is paused at once; a Safety specialist or the Incident Lead must confirm or lift it. It never lifts itself. |
 | ![Incident queue](docs/screenshots/01_queue.png) | ![Automatic pause awaiting review](docs/screenshots/02_auto_pause_awaiting_review.png) |
-| **The AI's claims shown next to their evidence.** The AI said P2; the safety controls raised it to P1 and kept the Legal/Privacy route. A claim citing evidence that doesn't exist is marked in red. | **People stay accountable.** A Risk Ops analyst cannot approve containment on a P0 case; the button is disabled and explains that the Incident Lead is needed. The service layer enforces the same rule. |
+| **The AI's claims shown next to their evidence.** The AI said P2; the safety controls raised it to P1 and kept the Legal/Privacy route. A claim citing evidence that doesn't exist is marked in red. | **People stay accountable.** A Risk Ops analyst cannot approve containment on a P0 case; the button is disabled and explains that the Incident Lead is needed. The service layer enforces the same rule. The action panel stays pinned beside the case file and scrolls on its own. |
 | ![AI assessment with cited evidence](docs/screenshots/04_ai_assessment_facts.png) | ![Containment needs Incident Lead](docs/screenshots/06_containment_needs_incident_lead.png) |
+| **Where every ticket is.** The dashboard charts tickets across the eight workflow stages (Intake → QA), split by severity. Stage and severity filters drive the chart and a sortable ticket list. | **Rule changes are tested before trust.** Switching to a revised rule version runs the regression gate on the frozen held-out cases. Here it finds no regression and, honestly, no improvement either. |
+| ![Dashboard: tickets by workflow stage](docs/screenshots/12_dashboard.png) | ![Regression check](docs/screenshots/11_regression_check.png) |
 
 More screenshots, covering the full demo, are in [`docs/screenshots/`](docs/screenshots/) and [`docs/demo_walkthrough.md`](docs/demo_walkthrough.md).
 
@@ -108,6 +110,10 @@ Tests call the services directly to confirm these checks can't be bypassed.
 * Simulated containment with review and expiry times, reversal, and automatic expiry.
 * Operational monitoring that keeps seeded history separate from demo actions, reports repeat issues as counts only, and uses configurable prototype SLA targets (`config/sla.json`).
 * A regression gate and quality alert that compares rule versions on the frozen held-out split.
+* A workflow-stage view on the dashboard (stacked by severity, with stage and severity filters and a sortable ticket list), plus stage filtering and sorting on the queue.
+* A case layout built for working: the action panel is pinned on desktop and scrolls independently of the case file.
+* Plain-language form validation: missing or invalid fields are listed in words, never as raw errors.
+* Safe hosted updates: the app reloads its own code when a new version is deployed, so it never mixes old and new modules.
 
 ## Evaluation status (what actually ran)
 
@@ -180,6 +186,6 @@ docs/               documentation and screenshots
 
 ## Project status
 
-* **Implemented and tested locally:** the full workflow, UI, taxonomy v2, rules v2.0/v2.1, controls C1–C7 (including the automatic pause), offline providers, the fault-injection harness, the evaluation harness, and the seed/reset command. There are 69 automated tests, all passing. A browser smoke test covered every page, and the demo (including confirming an automatic pause) was driven end to end in headless Chromium.
+* **Implemented and tested locally:** the full workflow, UI, taxonomy v2, rules v2.0/v2.1, controls C1–C7 (including the automatic pause), offline providers, the fault-injection harness, the evaluation harness, and the seed/reset command. There are 71 automated tests, all passing. A browser smoke test covered every page, and the demo (including confirming an automatic pause) was driven end to end in headless Chromium.
 * **Simulated:** containment, communications, identities and roles, historical timestamps (seeded), and offline AI outputs.
 * **Unvalidated:** labels (single author), live-model quality (not run), claim-support accuracy (no reviews), and any time-savings claim (no study; see the protocol).
