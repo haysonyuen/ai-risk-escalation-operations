@@ -23,6 +23,10 @@ def render() -> None:
     c = conn()
     active = get_setting(c, "active_rule_version")
     versions = available_versions()
+    if active not in versions:  # e.g. a database from an older demo-data version
+        st.warning(f"The stored active rule version `{active}` is no longer available (archived). "
+                   f"Showing `{versions[0]}`. Use **Reset demo data** in the sidebar to rebuild the demo data.")
+        active = versions[0]
     md(f"Active rule version: {badge(active, 'b-rules')} · controls {badge(CONTROLS_VERSION, 'b-muted')} · "
        f"prompt {badge(get_setting(c, 'active_prompt_version'), 'b-muted')}")
     _labels = ["Readable rules", "Change rules + regression check", "Controls, prompts & SLA", "Severity framework"]
@@ -114,7 +118,9 @@ def render() -> None:
 """)
         st.markdown("**Prompt versions** (used only in live mode)")
         pv = st.selectbox("Prompt", sorted(p.stem for p in config.PROMPT_DIR.glob("prompt-v*.md")))
-        st.code((config.PROMPT_DIR / f"{pv}.md").read_text()[:5000], language="markdown")
+        pf = config.PROMPT_DIR / f"{pv}.md"
+        if pf.exists():
+            st.code(pf.read_text()[:5000], language="markdown")
         st.markdown("**SLA targets — PROTOTYPE ASSUMPTIONS** (config/sla.json)")
         sla = config.sla_config()
         st.caption(sla["note"])

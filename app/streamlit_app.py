@@ -14,6 +14,13 @@ if _v < (1, 50):
              "`python -m streamlit run app/streamlit_app.py`")
     st.stop()
 
+import _reload_guard  # noqa: E402
+
+# Hosted apps can hot-reload this script after a git pull while keeping older copies of the
+# riskops package in memory, which mixes new files with old code. Drop cached project modules
+# whenever the code on disk changes, so every run uses one consistent version.
+_reload_guard.refresh_if_code_changed()
+
 import common  # noqa: E402  (adds repo root to sys.path)
 import page_case  # noqa: E402
 import page_dashboard  # noqa: E402

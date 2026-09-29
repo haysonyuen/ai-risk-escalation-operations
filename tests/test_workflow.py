@@ -405,3 +405,30 @@ def test_old_demo_database_is_rebuilt(tmp_path):
     ensure_seeded(old)
     c = connect(old)
     assert rows(c, "SELECT value FROM settings WHERE key='demo_data_version'")[0]["value"] == DEMO_DATA_VERSION
+
+
+def test_reload_guard_drops_stale_project_modules():
+    # Hosted apps can hot-reload new files while old riskops modules stay cached (seen after
+    # deploys as ImportError / schema ValidationError). The guard drops them when code changes.
+    import importlib
+    import os
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
+    guard = importlib.import_module("_reload_guard")
+    saved = {k: v for k, v in sys.modules.items() if k == "riskops" or k.startswith("riskops.")}
+    sys.modules.pop(guard._STATE, None)
+    importlib.import_module("riskops.config")
+    guard.refresh_if_code_changed()               # first run: anything preloaded is untrusted
+    assert "riskops.config" not in sys.modules
+    importlib.import_module("riskops.config")
+    assert guard.refresh_if_code_changed() is False  # unchanged code: nothing dropped
+    f = Path(guard.ROOT / "riskops" / "config.py")
+    st = f.stat()
+    try:
+        os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
+        assert guard.refresh_if_code_changed() is True
+        assert "riskops.config" not in sys.modules
+    finally:
+        os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns))
+        sys.modules.update(saved)  # keep other tests on the module objects they imported
