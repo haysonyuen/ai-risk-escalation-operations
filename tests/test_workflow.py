@@ -291,3 +291,32 @@ def test_closure_blockers_match_close_incident_checks(conn, actors):
     assert any("containment" in b for b in blockers) and any("awaits" in b for b in blockers)
     with pytest.raises(wf.WorkflowError):
         wf.close_incident(conn, iid, _closure("P0"), actors["sam.lead"])
+
+
+def test_concurrent_first_load_seeds_once_without_collision(tmp_path):
+    """Regression: on a hosted app, simultaneous first page loads raced to seed the same file
+    and crashed with 'Incident INC-1001 already exists'."""
+    import threading
+
+    from riskops.seed import ensure_seeded
+
+    target = tmp_path / "shared.db"
+    errors = []
+    start = threading.Barrier(8)  # release all "page loads" at the same instant
+
+    def load():
+        start.wait()
+        try:
+            ensure_seeded(target)
+        except Exception as e:  # pragma: no cover - failure path
+            errors.append(e)
+
+    threads = [threading.Thread(target=load) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors
+    c = connect(target)
+    assert rows(c, "SELECT COUNT(*) n FROM incidents")[0]["n"] == 12
+    assert not list(tmp_path.glob("*.tmp"))

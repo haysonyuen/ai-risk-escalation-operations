@@ -212,10 +212,8 @@ def open_conn() -> None:
             old.close()
         except Exception:
             pass
-    path = db_file()
-    if not path.exists():
-        from riskops.seed import seed
-        seed(str(path))
+    from riskops.seed import ensure_seeded
+    path = ensure_seeded(db_file())
     st.session_state["_conn"] = connect(path)
 
 
