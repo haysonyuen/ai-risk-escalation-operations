@@ -432,3 +432,17 @@ def test_reload_guard_drops_stale_project_modules():
     finally:
         os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns))
         sys.modules.update(saved)  # keep other tests on the module objects they imported
+
+
+def test_intake_validation_errors_are_shown_in_plain_language():
+    import sys
+    from pathlib import Path
+    import pytest as _pytest
+    from pydantic import ValidationError
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
+    common = _pytest.importorskip("common")
+    with _pytest.raises(ValidationError) as ei:
+        make_intake(title="", reported_behavior="")
+    msg = common.friendly_error(ei.value)
+    assert "Short title" in msg and "What was reported" in msg and "is required" in msg
+    assert "pydantic" not in msg and "string_too_short" not in msg
