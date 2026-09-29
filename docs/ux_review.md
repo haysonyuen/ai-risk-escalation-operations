@@ -71,3 +71,12 @@ The first interface worked, but it was organized around *data* (one tab per tabl
 * `scripts/ui_walkthrough.py` drives the demo through the redesigned interface in headless Chromium. It asserts that **a Safety specialist can confirm an automatic pause**, that **Risk Ops cannot approve P0 containment**, and that **the Incident Lead cannot approve a draft flagged for Legal/Privacy** (both controls are disabled). It produced `docs/screenshots/01–13`.
 * `scripts/ui_smoke.py` opens every page and every case section and checks that none raises an exception.
 * `tests/test_workflow.py::test_next_actions_guide_by_status_and_role` and `::test_closure_blockers_match_close_incident_checks` cover the new guidance services.
+
+## Second review (after hosting)
+
+Looking at the app as a first-time visitor arriving from a link turned up five issues, now fixed:
+1. **No starting point.** The queue now opens with a dismissible tour: four buttons that each open a case showing one idea and select the right role.
+2. **Role friction.** Most steps belong to another role. The case page now offers **Act as …** buttons next to the Next panel instead of sending people to the sidebar.
+3. **Hard-to-scan queue.** Severity cells are colour-coded, and the flags (⏸️ ⚑ 🧪) sit next to severity so they never scroll out of view. Columns are sized to fit a laptop screen, a 🔒 marks steps your role can't take, and the long legend moved into a **How to read this** popover.
+4. **Crowded sidebar.** The public-demo notice is now a one-line caption instead of a large panel.
+5. **Table-only dashboard.** Issue categories are a bar chart, and override directions use plain words ("severity raised", "only the owning team changed").

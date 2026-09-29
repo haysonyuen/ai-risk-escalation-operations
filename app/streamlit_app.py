@@ -80,8 +80,8 @@ with st.sidebar:
                 st.rerun()
     st.caption("Prototype · synthetic incidents · all containment and messages are simulated")
     if common.public_demo():
-        st.info("Public demo: you have your own private copy of the demo data. Changes you make are not seen by "
-                "other visitors and are discarded when you leave. Please don't enter real personal data.")
+        st.caption("🔒 **Public demo** — your own private copy of the data; nobody else sees your changes and it "
+                   "resets when you leave. Please don't enter real personal data.")
 
 common.feedback("global")
 common.show_toasts()
