@@ -43,7 +43,7 @@ def _status_section() -> None:
     items = [x for x in q if phase(x["status"]) in picked and x["effective_severity"] in sevs and (not pols or x["policy"] in pols)]
     open_items = [x for x in items if x["status"] in monitoring.OPEN]
     k1, k2, k3 = st.columns(3)
-    k1.metric("⏸️ Auto-paused (C7)", sum(1 for x in items if x["auto_paused"]), help="Waiting for the Safety specialist or Incident Lead")
+    k1.metric("⏸️ Auto-paused sessions", sum(1 for x in items if x["auto_paused"]), help="Waiting for the Safety specialist or Incident Lead")
     k2.metric("⚠️ SLA overdue", sum(1 for x in open_items if x["overdue"]), help="Open cases past the first-review target")
     k3.metric("Closed · QA pending", sum(1 for x in items if x["status"] == "CLOSED"), help="Closed cases not yet QA reviewed")
     if not items:
@@ -134,7 +134,7 @@ def render() -> None:
          "SLA breaches": f"{s['containment_breaches']} of {s['containment_evaluated']}"},
     ]), hide_index=True, use_container_width=True)
 
-    st.subheader("Auto-pause (C7)")
+    st.subheader("Automatic session pauses")
     h = m["auto_hold"]
     st.caption("P0 CBRN and child-safety cases pause the reported session automatically; a person must confirm or lift the pause. "
                "Simulated — nothing is paused in any real system.")

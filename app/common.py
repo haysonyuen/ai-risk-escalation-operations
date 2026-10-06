@@ -88,7 +88,7 @@ SOURCE_LABEL = {
     "none": ("Not assessed", "b-muted"),
 }
 BASIS_LABEL = {"human": "confirmed", "ai_after_controls": "AI-suggested · not confirmed",
-               "rules_after_ai_failure": "rules · AI failed", "unassessed_default": "default · not assessed"}
+               "rules_after_ai_failure": "needs manual triage", "unassessed_default": "default · not assessed"}
 CONTROL_NAME = {
     "C1": "Unusable AI output", "C2": "Missing evidence", "C3": "Severity floor", "C4": "Embedded instructions",
     "C5": "Low-confidence review", "C6": "Specialist route", "C7": "Auto-pause",
@@ -129,7 +129,7 @@ GLOSSARY = {
         ("AI recommendation", "Severity and route suggested by the AI assessment, before any checks."),
         ("Safety controls", "Fixed checks applied after the AI: " + "; ".join(f"{control_name(k)}" for k in CONTROL_NAME)
          + ". They can raise severity or force review, never lower it."),
-        ("Auto-pause (C7)", "P0 CBRN or child-safety cases pause the reported session automatically. "
+        ("Session auto-paused", "Shown as 'Auto-pause (control C7)' in technical views. P0 CBRN or child-safety cases pause the reported session automatically. "
                             "A Safety specialist or the Incident Lead must confirm or lift it; it never lifts itself."),
         ("Rules version", "The versioned rulebook that sets a minimum severity from warning signs in the report."),
         ("Demo AI", "Pre-written or simulated assessments; no live model is called in this demo."),
@@ -149,9 +149,9 @@ def ver(v: str | None) -> str:
     return v.split("-", 1)[1].replace("-", " ") if "-" in v else v
 
 
-SEVERITY_BASIS_WORD = {"human": "Confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "Rules (AI failed)",
+SEVERITY_BASIS_WORD = {"human": "Confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "Needs manual triage",
                        "unassessed_default": "Not assessed"}
-POLICY_STATUS_WORD = {"human": "Confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "Rules-suggested",
+POLICY_STATUS_WORD = {"human": "Confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "Not confirmed",
                       "unassessed_default": "—"}
 
 
@@ -160,11 +160,13 @@ def alerts(x: dict) -> list[str]:
     is_open = x["status"] not in ("CLOSED", "QA_REVIEWED")
     out = []
     if x["auto_paused"]:
-        out.append("Paused (C7)")
+        out.append("Session auto-paused")
     if x["overdue"] and is_open:
         out.append("SLA overdue")
     if x["mandatory_review"] and is_open and not x["human_severity"]:
         out.append("Review required")
+    if x["ai_status"] == "failed" and is_open and not x["human_severity"]:
+        out.append("AI failed")
     if x["ai_source"] == "fault_injection":
         out.append("Test data")
     return out
@@ -175,7 +177,7 @@ def policy_with_more(x: dict) -> str:
     return policies.label(x["policy"], code=False) + (f" (+{n} more)" if n else "") if x["policy"] else "Not assessed"
 
 
-POLICY_BASIS = {"human": "✓ confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "rules-suggested · AI failed",
+POLICY_BASIS = {"human": "✓ confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "not confirmed · AI failed",
                 "unassessed_default": "not assessed"}
 
 
@@ -206,7 +208,7 @@ SPLIT_NAME = {"dev": "Dev set", "held_out": "Held-out set", "all": "All cases"}
 SPLIT_HELP = {"dev": "used for tuning", "held_out": "frozen, never used for tuning", "all": "dev + held-out"}
 GATE_LABEL = {"P0/P1 recall (after controls)": "P0/P1 recall", "Mandatory review compliance": "Mandatory review flagged when needed",
               "Severity within acceptable range": "Severity within range", "Primary route acceptable": "Route acceptable",
-              "Schema-valid rate": "Valid AI output", "C7 auto-pause recall": "Auto-pause (C7) recall"}
+              "Schema-valid rate": "Valid AI output", "C7 auto-pause recall": "Auto-pause recall"}
 OVERRIDE_DIRECTION = {"raised": "Raised severity", "lowered": "Lowered severity", "route_only": "Route only (owning team changed)",
                       "policy_only": "Policy only (policy changed)"}
 TEAMS = SCHEMA_TEAMS
@@ -329,9 +331,17 @@ def sev_badge(sev: str | None, suffix: str = "") -> str:
     return badge(f"{sev}{(' · ' + suffix) if suffix else ''}", f"b-{sev.lower()}")
 
 
+SOURCE_HELP = {
+    "offline_fixture": "The AI assessment is pre-written for the demo; no live model was called.",
+    "offline_simulation": "The AI assessment is simulated for the demo; no live model was called.",
+    "live_model": "The assessment came from a live model call.",
+    "fault_injection": "Test data: the AI was deliberately broken (fault injection) to check that the safety controls still hold.",
+}
+
+
 def source_badge(kind: str | None) -> str:
     t, c = SOURCE_LABEL.get(kind or "none", (kind, "b-muted"))
-    return badge(t, c)
+    return badge(t, c, SOURCE_HELP.get(kind or ""))
 
 
 def stepper(status: str) -> str:
@@ -569,7 +579,7 @@ def describe_event(e: dict) -> str:
     if t == "containment_proposed":
         return f"{who} proposed containment <b>{action_label(nv['action_type'])}</b> on {esc(nv['target'])} [simulated]"
     if t == "auto_hold_applied":
-        return (f"<b>⏸️ Auto-pause (C7)</b> applied to {esc(pretty(details.get('action_type', '')))} — {esc(e['reason'] or '')}"
+        return (f"<b>⏸️ Session auto-paused</b>: automatic pause applied to {esc(pretty(details.get('action_type', '')))} — {esc(e['reason'] or '')}"
                 f" [simulated · awaiting human review]")
     if t in ("auto_hold_confirmed", "auto_hold_lifted"):
         return f"{who} <b>{'confirmed' if t.endswith('confirmed') else 'lifted'}</b> the automatic pause [simulated]{reason}"

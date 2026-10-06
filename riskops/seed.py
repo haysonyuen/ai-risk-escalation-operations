@@ -18,7 +18,7 @@ from .providers import FaultInjectionProvider, OfflineProvider
 from .schemas import IncidentIntake
 
 # Bump when seeded data or the schema changes incompatibly; older local databases are rebuilt.
-DEMO_DATA_VERSION = "demo-v3-policies"
+DEMO_DATA_VERSION = "demo-v3-policies-2"
 A = {a.actor_id: a for a in wf.SIMULATED_ACTORS}
 SYS = wf.SYSTEM_ACTOR
 S = "seed"

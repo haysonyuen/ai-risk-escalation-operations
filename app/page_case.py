@@ -143,9 +143,14 @@ def _change_line(a, ctl) -> str:
     same = a["model_severity"] == a["controlled_severity"] and ai_route == a["controlled_route"]
     if same:
         return "The AI suggested the same; the safety controls made no change."
-    changed = [x for x in ctl["controls"] if x["id"] in ("C3", "C6")]
-    why = "; ".join(f"{control_name(x['id'])}: {humanize(x['detail'])}" for x in changed) or "safety controls"
-    return f"The AI suggested {a['model_severity']} → {ROUTE_LABEL[ai_route]}. Changed by {why}."
+    parts = []
+    for x in ctl["controls"]:
+        if x["id"] == "C3":
+            parts.append(f"raised to the rules' minimum severity ({x['detail'].replace('->', '→')})")
+        elif x["id"] == "C6":
+            parts.append(f"specialist team kept ({ROUTE_LABEL.get(a['controlled_route'], a['controlled_route'])})")
+    why = "; ".join(parts) or "changed by the safety checks"
+    return f"The AI suggested {a['model_severity']} → {ROUTE_LABEL[ai_route]}. Safety checks: {why}."
 
 
 def _summary(inc, intake, a) -> None:
@@ -501,7 +506,7 @@ def _containment_card(inc, a) -> None:
     pending = [x for x in acts if x["status"] == "proposed"]
     holds = [x for x in acts if x["status"] == "active" and x["proposed_source"] == "auto_hold" and not x["hold_review_outcome"]]
     active = [x for x in acts if x["status"] == "active" and x not in holds]
-    title = f"Containment — {len(pending)} pending, {len(active) + len(holds)} active" + (" · ⏸️ Auto-paused (C7)" if holds else "")
+    title = f"Containment — {len(pending)} pending, {len(active) + len(holds)} active" + (" · ⏸️ Session auto-paused" if holds else "")
     with st.expander(title, expanded=bool(pending or active or holds) or inc["status"] == "CONTAINMENT"):
         md(badge("SIMULATED — nothing is executed against any system", "b-sim-action"))
         hint_hold = permission_hint("review_auto_hold")
@@ -510,7 +515,7 @@ def _containment_card(inc, a) -> None:
             due = datetime.fromisoformat(x["review_by"])
             overdue = due <= datetime.now(timezone.utc)
             with st.container(border=True):
-                md(badge("⏸️ Auto-paused (C7)", "b-p0") + f" <b>{action_label(x['action_type'])}</b> on {esc(x['target'])}"
+                md(badge("⏸️ Session auto-paused · waiting for specialist review", "b-p0") + f" <b>{action_label(x['action_type'])}</b> on {esc(x['target'])}"
                    + f"<br><span class='small'>Applied automatically {ago(x['proposed_at'])} · {esc(x['rationale'])}<br>"
                    + ("<b>Review overdue — escalated to the Incident Lead. The pause stays on until a person decides.</b>" if overdue
                       else f"Confirm or lift {relative((due - datetime.now(timezone.utc)).total_seconds() / 60)} · it never lifts itself")
@@ -554,7 +559,7 @@ def _containment_card(inc, a) -> None:
         for x in active:
             with st.container(border=True):
                 due = datetime.fromisoformat(x["review_by"])
-                by = (f"Automatic pause (C7), confirmed by {esc(actor_name(x['hold_reviewed_by']))}" if x["proposed_source"] == "auto_hold"
+                by = (f"Automatic session pause, confirmed by {esc(actor_name(x['hold_reviewed_by']))}" if x["proposed_source"] == "auto_hold"
                       else f"Approved by {esc(actor_name(x['decided_by']))}")
                 exp = f"expires {x['expires_at'][:16].replace('T', ' ')} UTC" if x["expires_at"] else "no automatic expiry"
                 md(f"<b>{action_label(x['action_type'])}</b> on {esc(x['target'])} " + badge("ACTIVE · simulated", "b-p1")
@@ -690,7 +695,7 @@ def render() -> None:
     chips = [phase_badge(inc["status"]), policy_badge(pol, pol_basis), badge("Owner: " + (actor_name(inc["owner"]) if inc["owner"] else "unassigned")),
              source_badge(a["provider_kind"] if a else "none")]
     if row["auto_paused"]:
-        chips.append(badge("Paused (C7)", "b-p0",
+        chips.append(badge("Session auto-paused", "b-p0",
                            "The reported conversation was paused automatically because the case is rated P0 in CBRN or child safety. "
                            "A Safety specialist or the Incident Lead must confirm or lift it under Containment; it never lifts itself."
                            + (" The review is overdue and has been escalated to the Incident Lead." if row["auto_pause_overdue"] else "")))
@@ -701,12 +706,14 @@ def render() -> None:
     elif row["minutes_to_deadline"] is not None and not inc["human_severity"]:
         chips.append(badge("SLA: first review " + relative(row["minutes_to_deadline"]), "b-warn",
                            "Time left to make the first human severity decision (prototype SLA assumptions)."))
+    if a and a["status"] == "failed" and inc["status"] not in CLOSED and not inc["human_severity"]:
+        chips.append(badge("AI failed · needs manual triage", "b-p0",
+                           f"The AI assessment failed ({pretty(a['error_kind'])}). The severity shown comes only from the fixed rules as a "
+                           "placeholder. Read the evidence and decide severity, route and policy."))
     if row["mandatory_review"] and inc["status"] not in CLOSED and not inc["human_severity"]:
         chips.append(badge("Review required", "b-warn",
                            "A person must review the source evidence before any decision; the AI cannot clear this case. "
                            "See 'Why a person must review this' under AI analysis."))
-    if row["ai_source"] == "fault_injection":
-        chips.append(badge("Test data", "b-fault", "The AI assessment came from a fault-injection test: the AI was deliberately broken to check the safety controls."))
     if inc["origin"] == "seed":
         chips.append(badge("Synthetic demo data", "b-muted", "A made-up case seeded for the demo. No real people or systems are involved."))
     md(" ".join(chips))

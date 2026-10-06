@@ -553,7 +553,7 @@ def apply_auto_hold(conn, incident_id: str, hold: dict, origin: str = "demo", ts
                  " proposed_by, proposed_source, proposed_at, status, decided_by, decided_at, decision_reason, review_by,"
                  " expires_at, simulated) VALUES (?,?,?,?,?,1,?,?,?,?,?,?,?,?,NULL,1)",
                  (aid, incident_id, "pause_interaction", hold["target"], hold["reason"], SYSTEM_ACTOR.actor_id, "auto_hold",
-                  ts, "active", SYSTEM_ACTOR.actor_id, ts, "C7 automatic hold: " + hold["reason"],
+                  ts, "active", SYSTEM_ACTOR.actor_id, ts, "Automatic session pause: " + hold["reason"],
                   review_by.isoformat(timespec="seconds")))
     log_event(conn, incident_id=incident_id, actor_id=SYSTEM_ACTOR.actor_id, actor_role="system", event_type="auto_hold_applied",
               field=f"containment:{aid}", new="active", reason=hold["reason"], origin=origin, ts=ts,
@@ -914,7 +914,7 @@ def closure_blockers(conn, incident_id: str) -> list[str]:
     if n:
         out.append(f"{n} containment proposal(s) awaiting a decision")
     if pending_auto_holds(conn, incident_id):
-        out.append("An automatic pause (C7) has not been confirmed or lifted")
+        out.append("The automatic session pause has not been confirmed or lifted")
     for c in latest_communications(conn, incident_id):
         spec = json.loads(c["specialist_review_json"])
         if spec["required"] and c["status"] == "draft":
@@ -938,7 +938,7 @@ def next_actions(conn, incident_id: str) -> list[dict]:
     for h in pending_auto_holds(conn, incident_id):
         overdue = h["review_by"] <= now
         add("Confirm or lift the automatic pause" + (" — OVERDUE, escalated to Incident Lead" if overdue else ""),
-            f"Auto-pause (C7) paused {h['target']}. It stays paused until the Safety specialist or Incident Lead confirms or lifts it.", "review_auto_hold", urgent=True)
+            f"The system paused {h['target']} automatically. A Safety specialist or the Incident Lead must confirm or lift it.", "review_auto_hold", urgent=True)
     if st == "NEW":
         add("Run the AI assessment", "Or record a severity decision manually.", "run_assessment")
     if st in ("NEW", "ASSESSED", "ASSESSMENT_FAILED", "REOPENED"):
