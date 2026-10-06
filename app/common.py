@@ -302,6 +302,9 @@ h1{font-size:1.7rem!important} h2{font-size:1.35rem!important} h3{font-size:1.15
 .st-key-src_panel{border-left:5px solid #9aa3b2;padding-left:14px}
 .st-key-ai_panel{border-left:5px solid #8e6bd6;padding-left:14px}
 .raw{font-size:0.9rem;white-space:pre-wrap}
+.trail{border-collapse:collapse;font-size:0.88rem;margin:0 0 8px 0;width:100%}
+.trail td{border:none!important;padding:4px 10px 4px 0;vertical-align:top}
+.trail td:first-child{white-space:nowrap;color:#555;font-weight:600;width:150px}
 .tip{position:relative;cursor:help}.tip-i{opacity:.55;font-weight:400}
 .tip:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:0;z-index:1000;width:300px;white-space:normal;
   background:#1f2430;color:#fff;padding:9px 11px;border-radius:7px;font-weight:400;font-size:.8rem;line-height:1.4;

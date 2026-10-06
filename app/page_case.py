@@ -131,7 +131,7 @@ def ai_label(inc) -> str:
             f'({how})</div>')
 SIGNAL_HELP = {"Impact": "How bad it could be if the report is true (potential impact).",
                "Evidence": "How strong the attached evidence is.",
-               "AI confidence": "How sure the assessment is. Low confidence never lowers severity."}
+               "Confidence": "How sure the AI is. Low confidence never lowers severity."}
 
 
 def _hint_badge(label: str, value: str, cls: str = "b-muted") -> str:
@@ -147,20 +147,77 @@ def _review_texts(ctl: dict) -> list[str]:
     return texts
 
 
-def _change_line(a, ctl) -> str:
-    o = a["output"]
-    ai_route = o["suggested_primary_route"]
-    same = a["model_severity"] == a["controlled_severity"] and ai_route == a["controlled_route"]
-    if same:
-        return "The AI suggested the same; the safety controls made no change."
-    parts = []
+CHECKS_HELP = "Safety checks are fixed rules that run after the AI. They can raise severity or keep a specialist team, never lower anything."
+
+
+def _check_steps(a, ctl) -> list[str]:
+    """Plain sentences for what the safety checks changed (empty = no change)."""
+    rr = a["rule_result"]
+    out = []
     for x in ctl["controls"]:
         if x["id"] == "C3":
-            parts.append(f"raised to the rules' minimum severity ({x['detail'].replace('->', '→')})")
+            frm, to = [v.strip() for v in x["detail"].split("->")]
+            rule = next((t["description"] for t in rr["triggered_rules"] if t["id"] == rr["severity_rule_id"]), "")
+            why = f" when: {rule[0].lower() + rule[1:].rstrip('.')}" if rule else " for this kind of case"
+            out.append(f"Raised severity {frm} → {to}: the rules set {to} as the minimum{why}.")
         elif x["id"] == "C6":
-            parts.append(f"specialist team kept ({ROUTE_LABEL.get(a['controlled_route'], a['controlled_route'])})")
-    why = "; ".join(parts) or "changed by the safety checks"
-    return f"The AI suggested {a['model_severity']} → {ROUTE_LABEL[ai_route]}. Safety checks: {why}."
+            out.append(f"Kept {ROUTE_LABEL.get(a['controlled_route'], a['controlled_route'])} as the owning team: "
+                       "specialist cases stay with specialist teams.")
+    return out
+
+
+def _change_line(a, ctl) -> str:
+    """One-line version for the Summary card."""
+    o = a["output"]
+    if a["model_severity"] == a["controlled_severity"] and o["suggested_primary_route"] == a["controlled_route"]:
+        return "The AI's suggestion; the safety checks made no change."
+    bits = []
+    if a["model_severity"] != a["controlled_severity"]:
+        bits.append(f"raised it to {a['controlled_severity']}")
+    if o["suggested_primary_route"] != a["controlled_route"]:
+        bits.append(f"kept {ROUTE_LABEL.get(a['controlled_route'], a['controlled_route'])} as the owning team")
+    return (f"The AI suggested {a['model_severity']} → {ROUTE_LABEL[o['suggested_primary_route']]}; "
+            f"the safety checks {' and '.join(bits)}.")
+
+
+def _auto_action(inc) -> str:
+    holds = rows(conn(), "SELECT * FROM containment_actions WHERE incident_id=? AND proposed_source='auto_hold' ORDER BY proposed_at",
+                 (inc["incident_id"],))
+    if not holds:
+        return "None. Nothing was done to any system."
+    h = holds[-1]
+    if h["hold_review_outcome"] == "confirmed":
+        state = f"Confirmed by {esc(actor_name(h['hold_reviewed_by']).split(' —')[0])}."
+    elif h["hold_review_outcome"] == "lifted":
+        state = f"Lifted by {esc(actor_name(h['hold_reviewed_by']).split(' —')[0])}."
+    else:
+        state = "A Safety specialist or the Incident Lead must confirm or lift it (under Containment)."
+    return f"Session paused (the system pauses P0 child-safety and CBRN cases; simulated). {state}"
+
+
+def _recommendation(inc, a, ctl) -> None:
+    o = a["output"]
+    sug = policies.suggested(a)
+    with st.container(border=True):
+        md(f'<div style="font-size:1.05rem">{sev_badge(a["controlled_severity"])} → <b>{esc(ROUTE_LABEL[a["controlled_route"]])}</b>'
+           + (f' · {esc(policy_label(sug[0]))}' if sug else "") + "</div>"
+           + '<div class="small" style="margin-top:4px">'
+           + ("For a person to confirm or change in the decision panel →" if not inc["human_severity"]
+              else "A person has made the decision; see the decision panel →") + "</div>")
+    checks = _check_steps(a, ctl)
+    flagged = [x for x in ctl["controls"] if x["id"] in ("C2", "C4", "C5")]
+    step2 = ("<br>".join(esc(c) for c in checks) if checks
+             else "No change. The AI's suggestion already met the rules.")
+    if flagged:
+        step2 += "<br><span class='small'>Also flagged for human review (see below).</span>"
+    md('<div class="small" style="margin:8px 0 2px 0"><b>How we got here</b></div>'
+       '<table class="trail">'
+       f'<tr><td>① AI suggested</td><td>{sev_badge(a["model_severity"])} → {esc(ROUTE_LABEL[o["suggested_primary_route"]])}</td></tr>'
+       f'<tr><td><span class="tip" data-tip="{esc(CHECKS_HELP)}">② Safety checks <span class="tip-i">ⓘ</span></span></td><td>{step2}</td></tr>'
+       f'<tr><td>③ Automatic action</td><td>{_auto_action(inc)}</td></tr></table>')
+    md('<span class="small">AI\'s own read:</span> ' + _hint_badge("Impact", ctl["impact"]) + _hint_badge("Evidence", ctl["evidence_quality"])
+       + _hint_badge("Confidence", ctl["confidence"], "b-warn" if ctl["confidence"] == "low" else "b-muted")
+       + "".join(badge(CATEGORY_LABEL.get(x, x)) for x in o["risk_categories"]))
 
 
 def _summary(inc, intake, a) -> None:
@@ -191,7 +248,7 @@ def _summary(inc, intake, a) -> None:
         n_open = len(o["missing_information"]) + len(o["contradictions"])
         sug = policies.suggested(a)
         body = (f'<div><b>Recommendation:</b> {sev_badge(a["controlled_severity"])} → <b>{esc(ROUTE_LABEL[a["controlled_route"]])}</b> '
-                f'<span class="small">(after safety controls)</span></div>'
+                '</div>'
                 + f'<div class="small">{esc(_change_line(a, ctl))}</div>'
                 + (f'<div style="margin-top:6px"><b>Likely policy:</b> {esc(policy_label(sug[0]))}'
                    + (f'<span class="small">, also {esc(", ".join(policy_label(x) for x in sug[1:]))}</span>' if sug[1:] else "") + "</div>"
@@ -271,18 +328,7 @@ def _ai_analysis(inc, intake, a) -> None:
             st.error(f"The AI assessment failed ({pretty(a['error_kind'])}). No assessment was invented: triage from the source data. "
                      f"For reference only, the rules suggest {a['controlled_severity']} → {ROUTE_LABEL[a['controlled_route']]}.")
         else:
-            o = a["output"]
-            c1, c2 = st.columns(2)
-            with c1.container(border=True):
-                st.caption("AI recommends")
-                md(sev_badge(a["model_severity"]) + f" → {ROUTE_LABEL[o['suggested_primary_route']]}")
-            with c2.container(border=True):
-                st.caption("After safety controls")
-                md(sev_badge(a["controlled_severity"]) + f" → <b>{ROUTE_LABEL[a['controlled_route']]}</b>")
-            st.caption(_change_line(a, ctl))
-            md(_hint_badge("Impact", ctl["impact"]) + _hint_badge("Evidence", ctl["evidence_quality"])
-               + _hint_badge("AI confidence", ctl["confidence"], "b-warn" if ctl["confidence"] == "low" else "b-muted")
-               + "".join(badge(CATEGORY_LABEL.get(x, x)) for x in o["risk_categories"]))
+            _recommendation(inc, a, ctl)
         texts = _review_texts(ctl)
         if texts:
             with st.container(border=True):
