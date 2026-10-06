@@ -95,3 +95,11 @@ Feedback from people trying the prototype was that many labels were unclear at a
 * **The Quality page leads with a summary.** Four headline results, readable run names, a default view of the active rules on the held-out set (instead of the newest fault-injection run), a Compare tab that only offers runs on the same case set, and engineering detail moved under *Technical details*.
 
 This was a display-only change: statuses, transitions, rules, scores and the audit trail are unchanged.
+
+## Fourth review: separating source data from AI output
+
+Operators could not tell which text on the case page was raw and which was generated: report, AI assessment and AI-extracted facts were stacked in one scroll. The left side of the case page now has **Summary · Source data · AI analysis · Activity · Related**:
+* **Summary:** two cards, *What was reported* (📄 source data, grey border) and *What the AI concluded* (✨ AI-generated, purple border, "check before relying on it"), with the recommendation, what the safety controls changed, why a person must review and how many questions are open.
+* **Source data:** the report, intake fields and evidence exactly as received. Structured restricted-evidence and classifier fields (`key=value; …`) are displayed as readable fields; the stored data is unchanged and content is still never shown.
+* **AI analysis:** numbered sections: recommendation, summary, facts the AI found (each with its cited evidence inline and a supported/unsupported check), open questions (missing information, conflicting evidence, unverified possible explanations), suggested next steps, and a collapsed *How this was produced* (the former *AI details* tab).
+* The demo AI's summary no longer quotes rule IDs.

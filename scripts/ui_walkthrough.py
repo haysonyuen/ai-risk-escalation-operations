@@ -137,11 +137,14 @@ def _steps(ui: UI) -> None:
     ui.expect("Assistant may have shared our renewals file")
     ui.expect("Awaiting triage")  # phase chip + bar
     ui.expect("AI assessed · awaiting triage")  # stage detail line
+    ui.expect("What was reported")  # Summary tab: source card
+    ui.expect("What the AI concluded")  # Summary tab: AI card
     ui.shot("case_after_import")
 
     print("2. AI assessment with evidence and unknowns (offline fixture)")
+    ui.section("AI analysis")
     ui.expect("does not exist in this case")
-    ui.p.get_by_text("Facts the AI extracted").first.scroll_into_view_if_needed()
+    ui.p.get_by_text("3. Facts the AI found").first.scroll_into_view_if_needed()
     ui.shot("ai_assessment_facts")
 
     print("3. Human correction with a recorded reason")
@@ -192,7 +195,7 @@ def _steps(ui: UI) -> None:
     ui.section("Activity")
     ui.fill("Add an investigation note", "Access log export received (synthetic): no external views. Link revoked by customer admin.")
     ui.button("Add note")
-    ui.section("Evidence")
+    ui.section("Source data")
     ui.button("＋ Add evidence")
     ui.select("Source type", "telemetry", dialog=True)
     ui.fill("Source description", "Link access log export", dialog=True)
