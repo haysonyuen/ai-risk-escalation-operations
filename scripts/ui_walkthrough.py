@@ -140,7 +140,7 @@ def _steps(ui: UI) -> None:
     ui.expect("What was reported")  # Summary tab: source card
     ui.expect("What the AI concluded")  # Summary tab: AI card
     ui.expect("Likely policy:")
-    ui.expect("Policy: Enterprise data leakage (DL-01) · AI-suggested")  # header chip
+    ui.expect("Policy: DL-01 · Enterprise data leakage · AI-suggested")  # header chip
     ui.shot("case_after_import")
 
     print("2. AI assessment with evidence and unknowns (offline fixture)")
@@ -158,7 +158,7 @@ def _steps(ui: UI) -> None:
                                     "Treat as highly credible exposure until access is ruled out. E5 cited by the AI does not exist.")
     ui.button("Record override")
     ui.expect("P0 · confirmed")
-    ui.expect("Enterprise data leakage (DL-01) · ✓ confirmed")  # policy confirmed with the decision
+    ui.expect("DL-01 · Enterprise data leakage · ✓ confirmed")  # policy confirmed with the decision
     ui.expect("Stage 3 of 8: Triaged")
     ui.select("Owner", "Jordan")
     ui.button("Assign")

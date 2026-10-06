@@ -29,7 +29,8 @@ def test_primary_policy_follows_priority_and_drops_no_policy_issue():
     assert policies.primary(["privacy_pii", "child_safety"]) == "child_safety"
     assert policies.ordered(["benign_noise", "product_failure"]) == ["product_failure"]
     assert policies.ordered(["benign_noise"]) == ["benign_noise"]
-    assert policies.label("child_safety") == "Child safety (CS-01)"
+    assert policies.label("child_safety") == "CS-01 · Child safety"
+    assert policies.label("child_safety", code=False) == "Child safety" and policies.code("child_safety") == "CS-01"
 
 
 def test_policy_defaults_to_ai_suggestion_and_confirming_is_not_an_override(conn, actors):

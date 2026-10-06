@@ -34,7 +34,12 @@ def label(key: str | None, code: bool = True) -> str:
     p = get(key)
     if not p:
         return "—" if not key else key
-    return f"{p['name']} ({p['code']})" if code else p["name"]
+    return f"{p['code']} · {p['name']}" if code else p["name"]
+
+
+def code(key: str | None) -> str:
+    p = get(key)
+    return p["code"] if p else "—"
 
 
 def ordered(categories: list[str]) -> list[str]:

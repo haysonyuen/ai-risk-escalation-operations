@@ -59,7 +59,9 @@ def _status_section() -> None:
     table = pd.DataFrame([{
         "ID": x["incident_id"], "Severity": x["effective_severity"] + (" ✓" if x["severity_basis"] == "human" else " · AI"),
         "Status": phase(x["status"]) + (" ⏸️" if x["auto_paused"] else ""), "Stage": STATUS_LABEL[x["status"]],
-        "Title": x["title"], "Policy": policy_label(x["policy"]) + (" ✓" if x["policy_basis"] == "human" else ""),
+        "Title": x["title"],
+        "Code": (policies.code(x["policy"]) + (" ✓" if x["policy_basis"] == "human" else "")) if x["policy"] else "—",
+        "Policy": policy_label(x["policy"], code=False),
         "Age (h)": x["age_hours"], "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
         "Next action": x["next_actions"][0]["title"] if x["next_actions"] else "—"} for x in sorted(
             items, key=lambda x: (STATUS_PHASE[x["status"]], STATUS_STAGE[x["status"]], {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[x["effective_severity"]]))])
@@ -68,7 +70,9 @@ def _status_section() -> None:
                       key=f"d_table_{st.session_state.get('d_nonce', 0)}", height=min(36 * (len(table) + 1) + 4, 420),
                       column_config={"Age (h)": st.column_config.NumberColumn(format="%.1f", width=70),
                                      "ID": st.column_config.TextColumn(width=78), "Severity": st.column_config.TextColumn(width=70),
-                                     "Title": st.column_config.TextColumn(width=260)})
+                                     "Title": st.column_config.TextColumn(width=220),
+                                     "Code": st.column_config.TextColumn(width=80, help="Policy code. ✓ confirmed by a person"),
+                                     "Policy": st.column_config.TextColumn(width=190)})
     sel = ev.selection.rows if ev and hasattr(ev, "selection") else []
     if sel:
         st.session_state["d_nonce"] = st.session_state.get("d_nonce", 0) + 1

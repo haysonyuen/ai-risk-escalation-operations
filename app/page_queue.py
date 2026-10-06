@@ -44,7 +44,7 @@ def render() -> None:
 
     v, s, f = st.columns([3, 2, 1])
     view = v.segmented_control("View", VIEWS, default="Needs action", key="q_view", label_visibility="collapsed") or "Needs action"
-    search = s.text_input("Search", placeholder="Search ID, title or policy", label_visibility="collapsed", key="q_search")
+    search = s.text_input("Search", placeholder="Search ID, title, policy code or name", label_visibility="collapsed", key="q_search")
     with f.popover("Filters", use_container_width=True):
         phases = st.multiselect("Status", PHASES, key="q_phase",
                                 help=" · ".join(f"{k}: {v}" for k, v in PHASE_HELP.items()))
@@ -114,8 +114,9 @@ def render() -> None:
             "Severity": f"{x['effective_severity']} {basis_short[x['severity_basis']]}",
             "ID": x["incident_id"],
             "Title": x["title"],
-            "Policy": (policy_label(x["policy"]) + (" ✓" if x["policy_basis"] == "human" else " · AI" if x["policy"] else "")
-                       + (f" +{len(x['other_policies'])}" if x["other_policies"] else "")),
+            "Code": (policies.code(x["policy"]) + (" ✓" if x["policy_basis"] == "human" else " · AI" if x["policy"] else "")
+                     + (f" +{len(x['other_policies'])}" if x["other_policies"] else "")) if x["policy"] else "—",
+            "Policy": policy_label(x["policy"], code=False),
             "Status": status,
             "Stage": STATUS_LABEL[x["status"]],
             "Flags": " ".join(flags),
@@ -138,7 +139,7 @@ def render() -> None:
 
 **Flags**: ⚑ mandatory review pending · 🧪 fault-injection test data
 
-**Policy**: the policy the case may violate, with its code. `✓` a person confirmed it · `AI` suggested, not confirmed · `+1` more policies on the case. Hover a policy on the case page for its definition.
+**Code / Policy**: the policy the case may violate, e.g. `CS-01` *Child safety*. `✓` a person confirmed it · `AI` suggested, not confirmed · `+1` more policies on the case. Hover a policy on the case page for its definition.
 
 **Next action**: 🔒 means your current role can't do it. Switch roles with *Working as* in the sidebar.
 
@@ -155,7 +156,8 @@ def render() -> None:
             "Severity": st.column_config.TextColumn(width=86, help="✓ = human-confirmed. AI = recommendation after safety controls, not yet confirmed."),
             "ID": st.column_config.TextColumn(width=72),
             "Title": st.column_config.TextColumn(width=210),
-            "Policy": st.column_config.TextColumn(width=190, help="Policy the case may violate (code). ✓ confirmed by a person · AI suggested · +N other policies"),
+            "Code": st.column_config.TextColumn(width=104, help="Policy code. ✓ confirmed by a person · AI suggested, not confirmed · +N other policies on the case"),
+            "Policy": st.column_config.TextColumn(width=200, help="Name of the policy the case may violate"),
             "Status": st.column_config.TextColumn(width=128, help="Awaiting triage · In progress · Closed. ⏸️ auto-paused (C7) · ⚠️ SLA overdue"),
             "Stage": st.column_config.TextColumn(width=215, help="Detail within the status: Intake, AI assessment, Triage, Investigation, Containment, Response, Closure, QA review"),
             "Next action": st.column_config.TextColumn(width=186),
