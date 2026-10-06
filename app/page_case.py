@@ -117,8 +117,18 @@ def reopen_dialog(iid: str) -> None:
 # Three kinds of information, styled consistently: source data (grey, as received), AI analysis
 # (purple, generated, to be checked) and decisions (the action panel on the right).
 
-SRC_LABEL = '<div class="lbl lbl-src">📄 Source data · as received, not edited</div>'
-AI_LABEL = '<div class="lbl lbl-ai">✨ AI-generated · check before relying on it</div>'
+SRC_LABEL = '<div class="lbl lbl-src">📄 Source data · reported</div>'
+
+
+def ai_label(inc) -> str:
+    """'Requires human confirmation' until a person decides; then who reviewed it and how."""
+    if not inc["human_severity"]:
+        return '<div class="lbl lbl-ai">✨ AI-generated · requires human confirmation</div>'
+    ev = rows(conn(), "SELECT event_type FROM events WHERE incident_id=? AND event_type IN ('human_severity_confirmed','human_override')"
+                      " ORDER BY event_id DESC LIMIT 1", (inc["incident_id"],))
+    how = "overridden" if ev and ev[0]["event_type"] == "human_override" else "confirmed"
+    return (f'<div class="lbl lbl-ai">✨ AI-generated · reviewed by {esc(actor_name(inc["severity_decided_by"]).split(" —")[0])} '
+            f'({how})</div>')
 SIGNAL_HELP = {"Impact": "How bad it could be if the report is true (potential impact).",
                "Evidence": "How strong the attached evidence is.",
                "AI confidence": "How sure the assessment is. Low confidence never lowers severity."}
@@ -165,7 +175,7 @@ def _summary(inc, intake, a) -> None:
        + (f' · <span class="unknown">{len(unknown)} field(s) unknown</span> ({esc(", ".join(unknown))})' if unknown else "")
        + " · full details under <b>Source data</b></div></div>")
     if not a:
-        md(f'<div class="card ai">{AI_LABEL}<div class="card-h">What the AI concluded</div>Not assessed yet.</div>')
+        md(f'<div class="card ai">{ai_label(inc)}<div class="card-h">What the AI concluded</div>Not assessed yet.</div>')
         _rerun_button(inc, "Run AI assessment")
         return
     ctl = json.loads(a["controls_json"])
@@ -189,7 +199,7 @@ def _summary(inc, intake, a) -> None:
                 + f'<div style="margin-top:6px"><b>In short:</b> {esc(o["summary"])}</div>'
                 + need + f'<div class="small" style="margin-top:6px">{n_open} open question(s) · facts and evidence checks under <b>AI analysis</b></div>')
         need = ""
-    md(f'<div class="card ai">{AI_LABEL}<div class="card-h">What the AI concluded</div>{body}{need}</div>')
+    md(f'<div class="card ai">{ai_label(inc)}<div class="card-h">What the AI concluded</div>{body}{need}</div>')
 
 
 def _policy_section(inc, a) -> None:
@@ -250,7 +260,7 @@ def _ai_analysis(inc, intake, a) -> None:
     c = conn()
     me = current_actor()
     with st.container(key="ai_panel"):
-        md(AI_LABEL)
+        md(ai_label(inc))
         if not a:
             st.info("Not assessed yet.")
             _rerun_button(inc, "Run AI assessment")
@@ -726,7 +736,7 @@ def render() -> None:
         for x in acts:
             mine = wf.actor_can_do(c, me, x)
             items.append(f"<li><b>{esc(x['title'])}</b> — {esc(x['detail'])} "
-                         + (badge("you can do this", "b-human") if mine else badge("needs " + wf.who_can_do(x), "b-muted")) + "</li>")
+                         + ("" if mine else f'<span class="small">({esc(wf.who_can_do(x))})</span>') + "</li>")
         md(f'<div class="next{" ok" if not any(x["urgent"] for x in acts) else ""}"><b>Next</b><ul style="margin:4px 0 0 0">{"".join(items)}</ul></div>')
 
     left, right = st.columns([3, 2], gap="large")
