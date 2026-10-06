@@ -32,7 +32,7 @@ Open **INC-1002** and switch *Working as* to **Priya (Safety & Child Safety Spec
 Go to *New report* → **Import JSON** → **Load the walkthrough example** → **Import**. The case opens automatically.
 * DEMO-2001: an enterprise admin sees a share link on a customer renewals spreadsheet and can't tell who can open it.
 * Unknown fields (scope, recurrence, reversibility, external action) show as **Unknown** in red.
-* The **Next** panel says: *Decide severity and routing — you can do this*.
+* The **Next** panel says: *Decide severity and routing*. Steps that belong to another role name that role in brackets.
 
 ### 2. AI assessment with evidence and unknowns (60 s): `04_ai_assessment_facts.png`
 Read the *Summary* cards (📄 what was reported, ✨ what the AI concluded), then open *AI analysis*.
