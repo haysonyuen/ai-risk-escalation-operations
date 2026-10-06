@@ -145,6 +145,9 @@ def _steps(ui: UI) -> None:
 
     print("2. AI assessment with evidence and unknowns (offline fixture)")
     ui.section("AI analysis")
+    ui.expect("How we got here")
+    ui.expect("Raised severity P2 → P1")  # safety checks explained in a sentence
+    ui.expect("None. Nothing was done to any system.")
     ui.expect("2. Policy and why")
     ui.expect("does not exist in this case")
     ui.p.get_by_text("4. Facts the AI found").first.scroll_into_view_if_needed()

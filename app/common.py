@@ -127,7 +127,7 @@ GLOSSARY = {
     ],
     "Pipeline": [
         ("AI recommendation", "Severity and route suggested by the AI assessment, before any checks."),
-        ("Safety controls", "Fixed checks applied after the AI: " + "; ".join(f"{control_name(k)}" for k in CONTROL_NAME)
+        ("Safety checks", "Fixed rules applied after the AI (also called safety controls, C1–C7): " + "; ".join(f"{control_name(k)}" for k in CONTROL_NAME)
          + ". They can raise severity or force review, never lower it."),
         ("Session auto-paused", "Shown as 'Auto-pause (control C7)' in technical views. P0 CBRN or child-safety cases pause the reported session automatically. "
                             "A Safety specialist or the Incident Lead must confirm or lift it; it never lifts itself."),
