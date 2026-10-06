@@ -35,7 +35,7 @@ Go to *New report* → **Import JSON** → **Load the walkthrough example** → 
 * The **Next** panel says: *Decide severity and routing — you can do this*.
 
 ### 2. AI assessment with evidence and unknowns (60 s): `04_ai_assessment_facts.png`
-Stay on *Overview* and scroll to **AI assessment**.
+Read the *Summary* cards (📄 what was reported, ✨ what the AI concluded), then open *AI analysis*.
 * **AI recommends P2 → Product/UX.** **After safety controls: P1 → Legal/Privacy.** The page explains why: the recommendation was raised to the rules minimum, and the specialist route was kept.
 * Impact, evidence and confidence are shown separately from severity: *Potential impact: high*, *Evidence: partial*, *Confidence: low*.
 * **Why a human must review this** lists the reasons, including a cited evidence ID that doesn't exist.
@@ -69,7 +69,7 @@ It is flagged **Legal/Privacy review needed** and **NOT SENT**. As Sam, **Approv
 ### 6. Human-approved closure (50 s): `09_case_closed.png`, `10_activity_feed.png`
 As Sam:
 1. Click **Start investigation**, then add a note under *Activity*.
-2. Under *Evidence*, click **＋ Add evidence** and add E5, a synthetic access log showing no external views.
+2. Under *Source data*, click **＋ Add evidence** and add E5, a synthetic access log showing no external views.
 3. Click **Move to response**.
 4. **Reverse containment**, giving a reason.
 5. Click **Close case…**. The *Closure* card lists any blockers first (undecided proposals, pending specialist reviews). The dialog pre-fills the evidence and teams; enter the root cause, impact, actions and sign-off, then submit.

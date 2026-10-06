@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import streamlit as st
 
-from common import (action_label, control_name, ver, humanize, phase_badge, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
+from common import (action_label, control_name, readable_fields, ver, humanize, phase_badge, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
                     TEAMS, actor_name, ago, badge, conn, current_actor, describe_event, esc, feedback, go, md,
                     permission_hint, pretty, provider_for_mode, relative, run_action, run_inline, section, sev_badge,
                     source_badge, stepper)
@@ -112,105 +112,190 @@ def reopen_dialog(iid: str) -> None:
 
 
 # ============================================================================ left: case file
+# Three kinds of information, styled consistently: source data (grey, as received), AI analysis
+# (purple, generated, to be checked) and decisions (the action panel on the right).
 
-def _report(inc, intake) -> None:
-    st.markdown("#### Report")
-    md(f'<div class="quote">{esc(intake.reported_behavior)}</div>')
-    if intake.reported_impact != "unknown":
-        md(f"<b>Reported impact:</b> {esc(intake.reported_impact)}")
-    cells = [f"<div><span>Reported</span>{esc(intake.reported_at.strftime('%d %b %H:%M UTC'))} · {ago(intake.reported_at.isoformat())}</div>"]
-    for f, label in FIELD_LABEL.items():
-        v = getattr(intake, f)
-        val = '<span class="unknown">Unknown</span>' if v == "unknown" else esc(pretty(v))
-        cells.append(f"<div><span>{label}</span>{val}</div>")
-    md(f'<div class="kv">{"".join(cells)}</div>')
+SRC_LABEL = '<div class="lbl lbl-src">📄 Source data · as received, not edited</div>'
+AI_LABEL = '<div class="lbl lbl-ai">✨ AI-generated · check before relying on it</div>'
+SIGNAL_HELP = {"Impact": "How bad it could be if the report is true (potential impact).",
+               "Evidence": "How strong the attached evidence is.",
+               "AI confidence": "How sure the assessment is. Low confidence never lowers severity."}
 
 
-def _assessment(inc, intake, a) -> None:
-    c = conn()
-    me = current_actor()
-    st.markdown("#### AI assessment")
+def _hint_badge(label: str, value: str, cls: str = "b-muted") -> str:
+    return f'<span class="badge {cls}" title="{esc(SIGNAL_HELP.get(label, ""))}">{esc(label)}: {esc(value)}</span>'
+
+
+def _review_texts(ctl: dict) -> list[str]:
+    texts = []
+    for r in ctl["review_reasons"]:
+        t = humanize(r["reason"])
+        if not any(t == x or x.startswith(t) or t.startswith(x) for x in texts):
+            texts.append(t)
+    return texts
+
+
+def _change_line(a, ctl) -> str:
+    o = a["output"]
+    ai_route = o["suggested_primary_route"]
+    same = a["model_severity"] == a["controlled_severity"] and ai_route == a["controlled_route"]
+    if same:
+        return "The AI suggested the same; the safety controls made no change."
+    changed = [x for x in ctl["controls"] if x["id"] in ("C3", "C6")]
+    why = "; ".join(f"{control_name(x['id'])}: {humanize(x['detail'])}" for x in changed) or "safety controls"
+    return f"The AI suggested {a['model_severity']} → {ROUTE_LABEL[ai_route]}. Changed by {why}."
+
+
+def _summary(inc, intake, a) -> None:
+    unknown = [label for f, label in FIELD_LABEL.items() if getattr(intake, f) == "unknown"]
+    facts = " · ".join(esc(pretty(getattr(intake, f))) for f in ("product_surface", "customer_type", "scope")
+                       if getattr(intake, f) != "unknown")
+    md(f'<div class="card src">{SRC_LABEL}<div class="card-h">What was reported</div>'
+       f'<div class="quote">{esc(intake.reported_behavior)}</div>'
+       + (f"<div><b>Reported impact:</b> {esc(intake.reported_impact)}</div>" if intake.reported_impact != "unknown" else "")
+       + f'<div class="small" style="margin-top:6px">{facts} · reported {ago(intake.reported_at.isoformat())}<br>'
+       f'{len(intake.evidence)} evidence item(s)'
+       + (f' · <span class="unknown">{len(unknown)} field(s) unknown</span> ({esc(", ".join(unknown))})' if unknown else "")
+       + " · full details under <b>Source data</b></div></div>")
     if not a:
-        st.info("Not assessed yet.")
+        md(f'<div class="card ai">{AI_LABEL}<div class="card-h">What the AI concluded</div>Not assessed yet.</div>')
         _rerun_button(inc, "Run AI assessment")
         return
-    md(source_badge(a["provider_kind"]) + f'<span class="small">Rules {ver(a["rule_version"])} · prompt {ver(a["prompt_version"])} · '
-       f'safety controls {ver(json.loads(a["controls_json"]).get("controls_version", "controls-v1.0"))} · {ago(a["created_at"])}</span>')
     ctl = json.loads(a["controls_json"])
+    reasons = _review_texts(ctl)
+    need = ("<div style='margin-top:6px'><b>Needs a person because:</b><ul style='margin:2px 0 0 0'>"
+            + "".join(f"<li>{esc(t)}</li>" for t in reasons[:3])
+            + (f"<li class='small'>{len(reasons) - 3} more under AI analysis</li>" if len(reasons) > 3 else "") + "</ul></div>") if reasons else ""
     if a["status"] == "failed":
-        st.error(f"The AI assessment failed ({pretty(a['error_kind'])}). No assessment was invented — triage from the evidence. "
-                 f"For reference only, the deterministic rules suggest {a['controlled_severity']} → {ROUTE_LABEL[a['controlled_route']]}.")
+        body = (f'<div class="unknown">The AI assessment failed ({esc(pretty(a["error_kind"]))}). No assessment was invented: triage from the source data.</div>'
+                f'<div class="small">For reference only, the rules suggest {esc(a["controlled_severity"])} → {esc(ROUTE_LABEL[a["controlled_route"]])}.</div>')
     else:
         o = a["output"]
-        c1, c2 = st.columns(2)
-        with c1.container(border=True):
-            st.caption("AI recommends")
-            md(sev_badge(a["model_severity"]) + f" → {ROUTE_LABEL[o['suggested_primary_route']]}")
-        with c2.container(border=True):
-            st.caption("After safety controls")
-            md(sev_badge(a["controlled_severity"]) + f" → <b>{ROUTE_LABEL[a['controlled_route']]}</b>")
-        changed = [x for x in ctl["controls"] if x["id"] in ("C3", "C6")]
-        if changed:
-            st.caption("Changed by safety controls: " + "; ".join(f"{control_name(x['id'])}: {CONTROL_TEXT[x['id']].lower()} ({humanize(x['detail'])})" for x in changed))
-        md(f'{badge("Potential impact: " + ctl["impact"])}{badge("Evidence: " + ctl["evidence_quality"])}'
-           f'{badge("Confidence: " + ctl["confidence"], "b-warn" if ctl["confidence"] == "low" else "b-muted")}'
-           + "".join(badge(CATEGORY_LABEL.get(x, x)) for x in o["risk_categories"]))
-        st.write(o["summary"])
-    if ctl["review_reasons"]:
-        texts = []
-        for r in ctl["review_reasons"]:
-            t = humanize(r["reason"])
-            if not any(t == x or x.startswith(t) or t.startswith(x) for x in texts):
-                texts.append(t)
-        with st.container(border=True):
-            st.markdown(f"**Why a human must review this** ({len(texts)})")
-            for t in texts[:4]:
-                st.markdown(f"- {t}")
-            if len(texts) > 4:
-                with st.expander(f"{len(texts) - 4} more"):
-                    for t in texts[4:]:
-                        st.markdown(f"- {t}")
-    if a["status"] != "valid":
-        return
-    o = a["output"]
-    ev = {e.evidence_id: e for e in intake.evidence}
-    st.markdown("**Facts the AI extracted** — each shown with the evidence it cites. Mark whether the evidence supports it.")
-    latest = {r["fact_index"]: r["verdict"] for r in rows(c, "SELECT fact_index, verdict FROM claim_reviews WHERE assessment_id=? ORDER BY review_id", (a["assessment_id"],))}
-    can_review = wf.can(me, "claim_review")
-    for i, f in enumerate(o["reported_facts"]):
-        md(f"<b>{i + 1}.</b> {esc(f['statement'])} " + "".join(badge(r, "b-fault" if r not in ev else "b-muted") for r in f["evidence_ids"]))
-        cites = []
-        for r in f["evidence_ids"]:
-            if r in ev:
-                cites.append(f"<b>{r}</b> · {esc(ev[r].source_description)}: {esc(ev[r].content)}")
-            else:
-                cites.append(f'<span class="unknown">{r} does not exist in this case — treat this fact as unsupported</span>')
-        md('<div class="cite">' + "<br>".join(cites) + "</div>")
+        n_open = len(o["missing_information"]) + len(o["contradictions"])
+        body = (f'<div><b>Recommendation:</b> {sev_badge(a["controlled_severity"])} → <b>{esc(ROUTE_LABEL[a["controlled_route"]])}</b> '
+                f'<span class="small">(after safety controls)</span></div>'
+                f'<div class="small">{esc(_change_line(a, ctl))}</div>'
+                f'<div style="margin-top:6px"><b>In short:</b> {esc(o["summary"])}</div>'
+                + need + f'<div class="small" style="margin-top:6px">{n_open} open question(s) · facts and evidence checks under <b>AI analysis</b></div>')
+        need = ""
+    md(f'<div class="card ai">{AI_LABEL}<div class="card-h">What the AI concluded</div>{body}{need}</div>')
 
-        def _save(i=i, key=f"cv_{a['assessment_id']}_{i}"):
-            v = st.session_state.get(key)
-            if v:
-                run_action(lambda: wf.record_claim_review(conn(), a["assessment_id"], i, v, current_actor()), "Support review saved", area="claims")
-        st.pills("Supported by evidence?", wf.CLAIM_VERDICTS, format_func=VERDICT_LABEL.get, key=f"cv_{a['assessment_id']}_{i}",
-                 default=latest.get(i), on_change=_save, disabled=not can_review, label_visibility="collapsed")
-    feedback("claims")
-    h1, h2, h3 = st.columns(3)
-    with h1:
-        st.markdown("**Hypotheses** (unverified)")
-        for h in o["hypotheses"] or [{"statement": "None", "basis": ""}]:
-            st.markdown(f"- _{h['statement']}_" + (f" <span class='small'>({esc(h['basis'])})</span>" if h["basis"] else ""), unsafe_allow_html=True)
-    with h2:
-        st.markdown("**Missing information**")
-        for m in o["missing_information"] or ["None listed"]:
-            st.markdown(f"- {m}")
-    with h3:
-        st.markdown("**Contradictions**")
-        for x in o["contradictions"] or [{"description": "None found", "evidence_ids": []}]:
-            st.markdown(f"- {x['description']} {' '.join(x['evidence_ids'])}")
-    if o["next_steps"]:
-        st.markdown("**AI-suggested next steps**")
-        for s in o["next_steps"]:
-            st.markdown(f"- {s}")
+
+def _source(inc, intake) -> None:
+    with st.container(key="src_panel"):
+        md(SRC_LABEL)
+        st.markdown("#### Report")
+        md(f'<div class="quote">{esc(intake.reported_behavior)}</div>')
+        if intake.reported_impact != "unknown":
+            md(f"<b>Reported impact:</b> {esc(intake.reported_impact)}")
+        cells = [f"<div><span>Reported</span>{esc(intake.reported_at.strftime('%d %b %H:%M UTC'))} · {ago(intake.reported_at.isoformat())}</div>"]
+        for f, label in FIELD_LABEL.items():
+            v = getattr(intake, f)
+            val = '<span class="unknown">Unknown</span>' if v == "unknown" else esc(pretty(v))
+            cells.append(f"<div><span>{label}</span>{val}</div>")
+        md(f'<div class="kv">{"".join(cells)}</div>')
+        st.divider()
+        head, btn = st.columns([3, 1.3], vertical_alignment="center")
+        head.markdown(f"#### Evidence ({len(intake.evidence)})")
+        hint = permission_hint("add_evidence")
+        if btn.button("＋ Add evidence", disabled=bool(hint), help=hint, use_container_width=True):
+            add_evidence_dialog(inc["incident_id"], f"E{len(intake.evidence) + 1}")
+        meta = {r["evidence_id"]: r for r in rows(conn(), "SELECT * FROM evidence WHERE incident_id=?", (inc["incident_id"],))}
+        for e in intake.evidence:
+            m = meta[e.evidence_id]
+            with st.container(border=True):
+                md(f"{badge(e.evidence_id, 'b-p3')} <b>{esc(e.source_description)}</b> {badge(pretty(e.source_type))}"
+                   f"<span class='small'> added by {esc(actor_name(m['added_by']))} · {ago(m['added_at'])}</span>")
+                md(f'<div class="raw">{readable_fields(e.content)}</div>')
+
+
+def _ai_analysis(inc, intake, a) -> None:
+    c = conn()
+    me = current_actor()
+    with st.container(key="ai_panel"):
+        md(AI_LABEL)
+        if not a:
+            st.info("Not assessed yet.")
+            _rerun_button(inc, "Run AI assessment")
+            return
+        ctl = json.loads(a["controls_json"])
+        st.markdown("#### 1. Recommendation")
+        if a["status"] == "failed":
+            st.error(f"The AI assessment failed ({pretty(a['error_kind'])}). No assessment was invented: triage from the source data. "
+                     f"For reference only, the rules suggest {a['controlled_severity']} → {ROUTE_LABEL[a['controlled_route']]}.")
+        else:
+            o = a["output"]
+            c1, c2 = st.columns(2)
+            with c1.container(border=True):
+                st.caption("AI recommends")
+                md(sev_badge(a["model_severity"]) + f" → {ROUTE_LABEL[o['suggested_primary_route']]}")
+            with c2.container(border=True):
+                st.caption("After safety controls")
+                md(sev_badge(a["controlled_severity"]) + f" → <b>{ROUTE_LABEL[a['controlled_route']]}</b>")
+            st.caption(_change_line(a, ctl))
+            md(_hint_badge("Impact", ctl["impact"]) + _hint_badge("Evidence", ctl["evidence_quality"])
+               + _hint_badge("AI confidence", ctl["confidence"], "b-warn" if ctl["confidence"] == "low" else "b-muted")
+               + "".join(badge(CATEGORY_LABEL.get(x, x)) for x in o["risk_categories"]))
+        texts = _review_texts(ctl)
+        if texts:
+            with st.container(border=True):
+                st.markdown(f"**Why a person must review this** ({len(texts)})")
+                for t in texts:
+                    st.markdown(f"- {t}")
+        if a["status"] == "valid":
+            o = a["output"]
+            st.markdown("#### 2. Summary")
+            st.write(o["summary"])
+
+            st.markdown("#### 3. Facts the AI found")
+            st.caption("Each fact is shown with the source evidence it cites (📄). Mark whether that evidence supports it.")
+            ev = {e.evidence_id: e for e in intake.evidence}
+            latest = {r["fact_index"]: r["verdict"] for r in rows(c, "SELECT fact_index, verdict FROM claim_reviews WHERE assessment_id=? ORDER BY review_id", (a["assessment_id"],))}
+            can_review = wf.can(me, "claim_review")
+            for i, f in enumerate(o["reported_facts"]):
+                md(f"<b>{i + 1}.</b> {readable_fields(f['statement'])} " + "".join(badge(r, "b-fault" if r not in ev else "b-muted") for r in f["evidence_ids"]))
+                cites = []
+                for r in f["evidence_ids"]:
+                    if r in ev:
+                        cites.append(f"📄 <b>{r}</b> · {esc(ev[r].source_description)}: {readable_fields(ev[r].content)}")
+                    else:
+                        cites.append(f'<span class="unknown">{r} does not exist in this case: treat this fact as unsupported</span>')
+                md('<div class="cite">' + "<br>".join(cites) + "</div>")
+
+                def _save(i=i, key=f"cv_{a['assessment_id']}_{i}"):
+                    v = st.session_state.get(key)
+                    if v:
+                        run_action(lambda: wf.record_claim_review(conn(), a["assessment_id"], i, v, current_actor()), "Evidence check saved", area="claims")
+                st.pills("Supported by evidence?", wf.CLAIM_VERDICTS, format_func=VERDICT_LABEL.get, key=f"cv_{a['assessment_id']}_{i}",
+                         default=latest.get(i), on_change=_save, disabled=not can_review, label_visibility="collapsed")
+            feedback("claims")
+
+            st.markdown("#### 4. Open questions")
+            st.markdown("**Missing information**")
+            st.markdown("\n".join(f"- {m}" for m in o["missing_information"]) or "- None listed")
+            st.markdown("**Conflicting evidence**")
+            st.markdown("\n".join(f"- {x['description']} {' '.join(x['evidence_ids'])}" for x in o["contradictions"]) or "- None found")
+            st.markdown("**Possible explanations** (unverified)")
+            for h in o["hypotheses"] or [{"statement": "None", "basis": ""}]:
+                st.markdown(f"- _{esc(h['statement'])}_" + (f" <span class='small'>({esc(h['basis'])})</span>" if h["basis"] else ""), unsafe_allow_html=True)
+
+            if o["next_steps"]:
+                st.markdown("#### 5. Suggested next steps")
+                st.markdown("\n".join(f"- {s}" for s in o["next_steps"]))
+
+        with st.expander("How this was produced"):
+            md(source_badge(a["provider_kind"]) + f'<span class="small">Rules {ver(a["rule_version"])} · prompt {ver(a["prompt_version"])} · '
+               f'safety controls {ver(ctl.get("controls_version", "controls-v1.0"))} · {ago(a["created_at"])}</span>')
+            rr = a["rule_result"]
+            st.markdown("**Safety controls applied**")
+            st.dataframe(pd.DataFrame([{"Control": control_name(x["id"]), "What it means": CONTROL_TEXT.get(x["id"], ""), "Effect": pretty(x["effect"]), "Detail": humanize(x["detail"])}
+                                       for x in ctl["controls"]] or [{"Control": "—", "What it means": "none triggered", "Effect": "", "Detail": ""}]),
+                         hide_index=True, use_container_width=True)
+            st.markdown(f"**Rules triggered** (Rules {ver(a['rule_version'])})")
+            st.dataframe(pd.DataFrame(rr["triggered_rules"] or [{"id": "—", "kind": "", "description": "no rule matched (default)"}]), hide_index=True, use_container_width=True)
+            if rr["injection_findings"]:
+                st.warning("Instructions embedded in the report (ignored): " + "; ".join(f"{x['location']}: {x['reason']}" for x in rr["injection_findings"]))
+            _rerun_button(inc, "Re-run AI assessment")
 
 
 def _rerun_button(inc, label: str) -> None:
@@ -222,21 +307,6 @@ def _rerun_button(inc, label: str) -> None:
         run_action(lambda: wf.run_assessment(conn(), inc["incident_id"], provider, current_actor()), "Assessment recorded", area="assess")
         st.rerun()
     feedback("assess")
-
-
-def _evidence(inc, intake) -> None:
-    head, btn = st.columns([3, 1.3], vertical_alignment="center")
-    head.markdown(f"#### Evidence ({len(intake.evidence)})")
-    hint = permission_hint("add_evidence")
-    if btn.button("＋ Add evidence", disabled=bool(hint), help=hint, use_container_width=True):
-        add_evidence_dialog(inc["incident_id"], f"E{len(intake.evidence) + 1}")
-    meta = {r["evidence_id"]: r for r in rows(conn(), "SELECT * FROM evidence WHERE incident_id=?", (inc["incident_id"],))}
-    for e in intake.evidence:
-        m = meta[e.evidence_id]
-        with st.container(border=True):
-            md(f"{badge(e.evidence_id, 'b-p3')} <b>{esc(e.source_description)}</b> {badge(pretty(e.source_type))}"
-               f"<span class='small'> added by {esc(actor_name(m['added_by']))} · {ago(m['added_at'])}</span>")
-            st.text(e.content)
 
 
 def _activity(inc) -> None:
@@ -298,32 +368,6 @@ def _related(inc) -> None:
                     run_action(lambda: wf.decide_link(c, k, current_actor(), False, lt, why), "Link rejected", area=f"lk{k}")
                     st.rerun()
                 feedback(f"lk{k}")
-
-
-def _ai_details(inc, a) -> None:
-    _rerun_button(inc, "Re-run AI assessment")
-    if not a:
-        return
-    rr, ctl = a["rule_result"], json.loads(a["controls_json"])
-    st.markdown("**Safety controls applied**")
-    st.dataframe(pd.DataFrame([{"Control": control_name(x["id"]), "What it means": CONTROL_TEXT.get(x["id"], ""), "Effect": pretty(x["effect"]), "Detail": humanize(x["detail"])}
-                               for x in ctl["controls"]] or [{"Control": "—", "What it means": "none triggered", "Effect": "", "Detail": ""}]),
-                 hide_index=True, use_container_width=True)
-    st.markdown(f"**Rules triggered** (Rules {ver(a['rule_version'])})")
-    st.dataframe(pd.DataFrame(rr["triggered_rules"] or [{"id": "—", "kind": "", "description": "no rule matched (default)"}]), hide_index=True, use_container_width=True)
-    if rr["injection_findings"]:
-        st.warning("Instructions embedded in the report (ignored): " + "; ".join(f"{x['location']}: {x['reason']}" for x in rr["injection_findings"]))
-    with st.expander("Signals and matched terms"):
-        st.write({k: v for k, v in rr["signals"].items() if v and not k.endswith("_in_system_evidence")})
-        st.caption(f"Matched terms: {rr['matched_terms']}")
-    if ctl.get("raw_text"):
-        with st.expander("Raw provider output"):
-            st.code(ctl["raw_text"][:6000])
-    hist = wf.list_assessments(conn(), inc["incident_id"])
-    st.markdown(f"**Assessment history** ({len(hist)} — all kept)")
-    st.dataframe(pd.DataFrame([{"when": h["created_at"], "source": h["provider_kind"], "rules": h["rule_version"], "prompt": h["prompt_version"],
-                                "status": h["status"], "AI": h["model_severity"], "after controls": h["controlled_severity"],
-                                "route": h["controlled_route"]} for h in hist]), hide_index=True, use_container_width=True)
 
 
 # ============================================================================ right: actions
@@ -620,19 +664,17 @@ def render() -> None:
 
     left, right = st.columns([3, 2], gap="large")
     with left:
-        sec = section(["Overview", "Evidence", "Activity", "Related", "AI details"], key="case_section")
-        if sec == "Overview":
-            _report(inc, intake)
-            st.divider()
-            _assessment(inc, intake, a)
-        elif sec == "Evidence":
-            _evidence(inc, intake)
+        sec = section(["Summary", "Source data", "AI analysis", "Activity", "Related"], key="case_section")
+        if sec == "Summary":
+            _summary(inc, intake, a)
+        elif sec == "Source data":
+            _source(inc, intake)
+        elif sec == "AI analysis":
+            _ai_analysis(inc, intake, a)
         elif sec == "Activity":
             _activity(inc)
-        elif sec == "Related":
-            _related(inc)
         else:
-            _ai_details(inc, a)
+            _related(inc)
     with right:
         # Keyed container: on desktop it is pinned (sticky) and scrolls on its own, so the actions
         # stay in view while the case file on the left is read (CSS: .st-key-case_actions).

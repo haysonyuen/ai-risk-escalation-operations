@@ -52,9 +52,10 @@ class OfflineSimulationProvider:
             ids = [e.evidence_id for e in incident.evidence if e.source_type != "reporter_statement"]
             contradictions.append({"description": "Evidence text indicates records that do not match the report (lexicon match, needs human reading).", "evidence_ids": ids})
         candidate = {
-            "summary": f"[SIMULATED] {incident.title}. Rules {rr.rule_version} matched {rr.severity_rule_id}; categories: {', '.join(rr.categories)}.",
+            "summary": f"[Demo AI] {incident.title}. The rules suggest {rr.severity}; harm areas: "
+                       f"{', '.join(c.replace('_', ' ') for c in rr.categories)}.",
             "reported_facts": facts,
-            "hypotheses": [{"statement": f"Possible {c.replace('_', ' ')} issue", "basis": "Rule/lexicon match only; not verified."} for c in rr.categories if c != "benign_noise"],
+            "hypotheses": [{"statement": f"Possible {c.replace('_', ' ')} issue", "basis": "Keyword match only; not verified."} for c in rr.categories if c != "benign_noise"],
             "missing_information": missing,
             "contradictions": contradictions,
             "risk_categories": rr.categories,

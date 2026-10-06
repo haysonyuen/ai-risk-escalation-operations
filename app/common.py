@@ -178,6 +178,27 @@ def action_label(t: str) -> str:
     return CONTAINMENT_LABEL.get(t, pretty(t))
 
 
+_KV = re.compile(r"^\s*([a-z][a-z0-9_]*)=(.+?)\s*$")
+
+
+def readable_fields(text: str) -> str:
+    """HTML for display. Structured 'key=value; key=value' records (restricted-evidence and classifier
+    fields) become 'Key: value · Key: value'; any other text is escaped unchanged."""
+    text = str(text)
+    head, sep, rest = text.partition(": ") if re.match(r"^[^=;]*: [a-z_]+=", text) else ("", "", text)
+    parts = [x for x in rest.split(";") if x.strip()]
+    kv = [_KV.match(x) for x in parts]
+    if sum(1 for m in kv if m) < 2:
+        return html.escape(text)
+    out = []
+    for x, m in zip(parts, kv):
+        if m:
+            out.append(f"<b>{html.escape(m.group(1).replace('_', ' ').capitalize())}:</b> {html.escape(m.group(2).replace('_', ' '))}")
+        else:
+            out.append(html.escape(x.strip()))
+    return (html.escape(head) + sep if sep else "") + " · ".join(out)
+
+
 def humanize(text: str) -> str:
     """Replace internal route keys in explanatory text with their display names."""
     # Only underscore keys (e.g. legal_privacy, child_safety): plain words such as "safety" or
@@ -225,6 +246,14 @@ h1{font-size:1.7rem!important} h2{font-size:1.35rem!important} h3{font-size:1.15
 .stepper div.done{border-color:#9bc2a8;color:#557}.stepper div.cur{border-color:#e05a47;color:#222;font-weight:700}
 .next{border-left:4px solid #e05a47;background:#fff8f6;padding:8px 14px;border-radius:4px;margin:4px 0 12px 0}
 .next.ok{border-left-color:#3d8b5f;background:#f5fbf7}
+.lbl{display:inline-block;font-size:0.72rem;font-weight:700;letter-spacing:.02em;padding:1px 8px;border-radius:4px;margin:0 0 6px 0}
+.lbl-src{background:#eef0f3;color:#4a5160}.lbl-ai{background:#efe8fb;color:#5b2d91}
+.card{border:1px solid #e3e5ea;border-radius:8px;padding:10px 14px 12px 14px;margin:6px 0 14px 0}
+.card.src{border-left:5px solid #9aa3b2}.card.ai{border-left:5px solid #8e6bd6;background:#fdfbff}
+.card-h{font-weight:700;font-size:1.02rem;margin:0 0 6px 0}
+.st-key-src_panel{border-left:5px solid #9aa3b2;padding-left:14px}
+.st-key-ai_panel{border-left:5px solid #8e6bd6;padding-left:14px}
+.raw{font-size:0.9rem;white-space:pre-wrap}
 .evt{font-size:0.86rem;padding:5px 0;border-bottom:1px solid #f0f0f2}.evt .t{color:#888;font-size:0.78rem}
 </style>
 """

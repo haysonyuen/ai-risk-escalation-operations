@@ -50,7 +50,7 @@ def main(out: Path) -> int:
         # every workspace tab
         page.locator('[data-testid="stSidebarNav"]').get_by_text("Case", exact=True).first.click()
         wait_idle(page)
-        labels = ["Overview", "Evidence", "Activity", "Related", "AI details"]
+        labels = ["Summary", "Source data", "AI analysis", "Activity", "Related"]
         for label in labels:
             tab = page.locator('[data-testid="stButtonGroup"]').get_by_text(label, exact=True).first
             tab.click()
