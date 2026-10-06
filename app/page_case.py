@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import streamlit as st
 
-from common import (action_label, humanize, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
+from common import (action_label, control_name, ver, humanize, phase_badge, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
                     TEAMS, actor_name, ago, badge, conn, current_actor, describe_event, esc, feedback, go, md,
                     permission_hint, pretty, provider_for_mode, relative, run_action, run_inline, section, sev_badge,
                     source_badge, stepper)
@@ -134,8 +134,8 @@ def _assessment(inc, intake, a) -> None:
         st.info("Not assessed yet.")
         _rerun_button(inc, "Run AI assessment")
         return
-    md(source_badge(a["provider_kind"]) + f'<span class="small">rules {a["rule_version"]} · prompt {a["prompt_version"]} · '
-       f'{json.loads(a["controls_json"]).get("controls_version", "controls-v1.0")} · {ago(a["created_at"])}</span>')
+    md(source_badge(a["provider_kind"]) + f'<span class="small">Rules {ver(a["rule_version"])} · prompt {ver(a["prompt_version"])} · '
+       f'safety controls {ver(json.loads(a["controls_json"]).get("controls_version", "controls-v1.0"))} · {ago(a["created_at"])}</span>')
     ctl = json.loads(a["controls_json"])
     if a["status"] == "failed":
         st.error(f"The AI assessment failed ({pretty(a['error_kind'])}). No assessment was invented — triage from the evidence. "
@@ -151,7 +151,7 @@ def _assessment(inc, intake, a) -> None:
             md(sev_badge(a["controlled_severity"]) + f" → <b>{ROUTE_LABEL[a['controlled_route']]}</b>")
         changed = [x for x in ctl["controls"] if x["id"] in ("C3", "C6")]
         if changed:
-            st.caption("Changed by controls: " + "; ".join(f"{CONTROL_TEXT[x['id']]} ({humanize(x['detail'])})" for x in changed))
+            st.caption("Changed by safety controls: " + "; ".join(f"{control_name(x['id'])}: {CONTROL_TEXT[x['id']].lower()} ({humanize(x['detail'])})" for x in changed))
         md(f'{badge("Potential impact: " + ctl["impact"])}{badge("Evidence: " + ctl["evidence_quality"])}'
            f'{badge("Confidence: " + ctl["confidence"], "b-warn" if ctl["confidence"] == "low" else "b-muted")}'
            + "".join(badge(CATEGORY_LABEL.get(x, x)) for x in o["risk_categories"]))
@@ -306,10 +306,10 @@ def _ai_details(inc, a) -> None:
         return
     rr, ctl = a["rule_result"], json.loads(a["controls_json"])
     st.markdown("**Safety controls applied**")
-    st.dataframe(pd.DataFrame([{"control": x["id"], "what it means": CONTROL_TEXT.get(x["id"], ""), "effect": x["effect"], "detail": x["detail"]}
-                               for x in ctl["controls"]] or [{"control": "—", "what it means": "none triggered", "effect": "", "detail": ""}]),
+    st.dataframe(pd.DataFrame([{"Control": control_name(x["id"]), "What it means": CONTROL_TEXT.get(x["id"], ""), "Effect": pretty(x["effect"]), "Detail": humanize(x["detail"])}
+                               for x in ctl["controls"]] or [{"Control": "—", "What it means": "none triggered", "Effect": "", "Detail": ""}]),
                  hide_index=True, use_container_width=True)
-    st.markdown(f"**Rules triggered** ({a['rule_version']})")
+    st.markdown(f"**Rules triggered** (Rules {ver(a['rule_version'])})")
     st.dataframe(pd.DataFrame(rr["triggered_rules"] or [{"id": "—", "kind": "", "description": "no rule matched (default)"}]), hide_index=True, use_container_width=True)
     if rr["injection_findings"]:
         st.warning("Instructions embedded in the report (ignored): " + "; ".join(f"{x['location']}: {x['reason']}" for x in rr["injection_findings"]))
@@ -411,7 +411,7 @@ def _containment_card(inc, a) -> None:
     pending = [x for x in acts if x["status"] == "proposed"]
     holds = [x for x in acts if x["status"] == "active" and x["proposed_source"] == "auto_hold" and not x["hold_review_outcome"]]
     active = [x for x in acts if x["status"] == "active" and x not in holds]
-    title = f"Containment — {len(pending)} pending, {len(active) + len(holds)} active" + (" · ⏸️ AUTO-PAUSED" if holds else "")
+    title = f"Containment — {len(pending)} pending, {len(active) + len(holds)} active" + (" · ⏸️ Auto-paused (C7)" if holds else "")
     with st.expander(title, expanded=bool(pending or active or holds) or inc["status"] == "CONTAINMENT"):
         md(badge("SIMULATED — nothing is executed against any system", "b-sim-action"))
         hint_hold = permission_hint("review_auto_hold")
@@ -420,7 +420,7 @@ def _containment_card(inc, a) -> None:
             due = datetime.fromisoformat(x["review_by"])
             overdue = due <= datetime.now(timezone.utc)
             with st.container(border=True):
-                md(badge("⏸️ AUTO-PAUSED · C7", "b-p0") + f" <b>{action_label(x['action_type'])}</b> on {esc(x['target'])}"
+                md(badge("⏸️ Auto-paused (C7)", "b-p0") + f" <b>{action_label(x['action_type'])}</b> on {esc(x['target'])}"
                    + f"<br><span class='small'>Applied automatically {ago(x['proposed_at'])} · {esc(x['rationale'])}<br>"
                    + ("<b>Review overdue — escalated to the Incident Lead. The pause stays on until a person decides.</b>" if overdue
                       else f"Confirm or lift {relative((due - datetime.now(timezone.utc)).total_seconds() / 60)} · it never lifts itself")
@@ -595,16 +595,16 @@ def render() -> None:
 
     md(f"{sev_badge(sev, BASIS_LABEL[basis])} <span class='muted'>{iid}</span>")
     st.markdown(f"## {esc(inc['title'])}")
-    chips = [badge(STATUS_LABEL[inc["status"]]), badge("Owner: " + (actor_name(inc["owner"]) if inc["owner"] else "unassigned")),
+    chips = [phase_badge(inc["status"]), badge("Owner: " + (actor_name(inc["owner"]) if inc["owner"] else "unassigned")),
              source_badge(a["provider_kind"] if a else "none")]
     if row["overdue"]:
-        chips.append(badge("First review " + relative(row["minutes_to_deadline"]), "b-p0"))
+        chips.append(badge("⚠️ SLA: first review " + relative(row["minutes_to_deadline"]), "b-p0"))
     elif row["minutes_to_deadline"] is not None and not inc["human_severity"]:
-        chips.append(badge("First review " + relative(row["minutes_to_deadline"]), "b-warn"))
+        chips.append(badge("SLA: first review " + relative(row["minutes_to_deadline"]), "b-warn"))
     if row["mandatory_review"] and inc["status"] not in CLOSED and not inc["human_severity"]:
         chips.append(badge("⚑ Mandatory human review", "b-warn"))
     if inc["origin"] == "seed":
-        chips.append(badge("synthetic seed data"))
+        chips.append(badge("Synthetic demo data"))
     md(" ".join(chips))
     md(stepper(inc["status"]))
 

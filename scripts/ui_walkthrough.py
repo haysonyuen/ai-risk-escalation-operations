@@ -120,9 +120,9 @@ def _steps(ui: UI) -> None:
     ui.p.goto(URL + "/case?id=INC-1002")
     ui.idle()
     ui.actor("Priya")
-    ui.expect("AUTO-PAUSED · C7")
+    ui.expect("Auto-paused (C7)")
     assert not ui.is_disabled("Confirm pause"), "A Safety specialist must be able to confirm the automatic pause"
-    ui.p.get_by_text("AUTO-PAUSED · C7").first.scroll_into_view_if_needed()
+    ui.p.get_by_text("Auto-paused (C7)").first.scroll_into_view_if_needed()
     ui.shot("auto_pause_awaiting_review")
     ui.fill_ph("Reason (lifting needs 20+ characters)", "Specialist verdict E1 confirmed; keep the session paused while Child Safety reviews.")
     ui.button("Confirm pause")
@@ -135,6 +135,8 @@ def _steps(ui: UI) -> None:
     ui.button("Load the walkthrough example")
     ui.button("Import")
     ui.expect("Assistant may have shared our renewals file")
+    ui.expect("Awaiting triage")  # phase chip + bar
+    ui.expect("AI assessed · awaiting triage")  # stage detail line
     ui.shot("case_after_import")
 
     print("2. AI assessment with evidence and unknowns (offline fixture)")
@@ -150,6 +152,7 @@ def _steps(ui: UI) -> None:
                                     "Treat as highly credible exposure until access is ruled out. E5 cited by the AI does not exist.")
     ui.button("Record override")
     ui.expect("P0 · confirmed")
+    ui.expect("Stage 3 of 8: Triaged")
     ui.select("Owner", "Jordan")
     ui.button("Assign")
     ui.p.get_by_text("Severity & routing decision").first.scroll_into_view_if_needed()
@@ -207,6 +210,7 @@ def _steps(ui: UI) -> None:
     ui.fill("Sign-off statement", "Reviewed E1-E5; severity kept P0 for the record; no external access found.", dialog=True)
     ui.button("Sign off and close", dialog=True)
     ui.expect("Reopen…")
+    ui.expect("Closed · QA pending")
     ui.shot("case_closed")
     ui.section("Activity")
     ui.shot("activity_feed")
@@ -218,12 +222,28 @@ def _steps(ui: UI) -> None:
     ui.fill("Rationale", "Adopt dev-derived fixes (blocked-attempt refusal, appeal routing, agent external actions) pending regression check.")
     ui.button("Change active rule version")
     ui.button("Run regression check")
-    ui.expect("No gated metric regressed", timeout=60000)
+    ui.expect("No regression on the gated metrics", timeout=60000)
     ui.shot("regression_check")
     ui.nav("Dashboard")
+    ui.expect("Tickets by status")
     ui.shot("dashboard")
+    ui.expand("Breakdown by stage")
     ui.nav("Quality & evaluation")
+    ui.expect("P0/P1 caught (recall)")
+    ui.expect("Rules v2.1 · held-out set (36)")
     ui.shot("quality")
+    print("8. Quality tabs: compare, run, overrides, glossary")
+    ui.section("Compare versions")
+    ui.expect("No regression on the gated metrics")
+    ui.expect("Now passing")
+    ui.shot("quality_compare")
+    ui.section("Run evaluation")
+    ui.button("Run evaluation")
+    ui.expect("with safety controls v1.2, on the dev set", timeout=60000)  # lands on Results with the new run
+    ui.section("Human overrides")
+    ui.expect("human decisions")
+    ui.section("About & glossary")
+    ui.expect("Regression gate")
 
 
 def main(out: Path) -> int:

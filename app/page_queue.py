@@ -3,16 +3,16 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from common import (CATEGORY_LABEL, STAGES, STATUS_LABEL, STATUS_STAGE, actor_name, conn, current_actor, go, go_case,
-                    relative)
+from common import (drop_stale, CATEGORY_LABEL, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE, actor_name, conn,
+                    current_actor, go, go_case, phase, relative, stage)
 from riskops import monitoring, workflow as wf
 
 VIEWS = ["Needs action", "My cases", "All open", "Closed", "All"]
 SORTS = {
     "Most urgent first": lambda x: x["urgency"],
     "Severity (P0 first)": lambda x: ({"P0": 0, "P1": 1, "P2": 2, "P3": 3}[x["effective_severity"]], x["urgency"]),
-    "Workflow stage (Intake → QA)": lambda x: (STATUS_STAGE[x["status"]], x["urgency"]),
-    "Workflow stage (QA → Intake)": lambda x: (-STATUS_STAGE[x["status"]], x["urgency"]),
+    "Status (Awaiting triage first)": lambda x: (STATUS_PHASE[x["status"]], STATUS_STAGE[x["status"]], x["urgency"]),
+    "Status (Closed first)": lambda x: (-STATUS_PHASE[x["status"]], -STATUS_STAGE[x["status"]], x["urgency"]),
     "Newest first": lambda x: x["age_hours"],
     "Oldest first": lambda x: -x["age_hours"],
 }
@@ -28,6 +28,8 @@ def render() -> None:
     q = monitoring.queue(c)
     open_q = [x for x in q if x["status"] in monitoring.OPEN]
 
+    for key, opts in (("q_sort", list(SORTS)), ("q_stage", STAGES), ("q_phase", PHASES)):
+        drop_stale(key, opts)
     head, btn = st.columns([5, 1], vertical_alignment="center")
     head.title("Incident queue")
     if btn.button("＋ New report", type="primary", use_container_width=True):
@@ -35,24 +37,27 @@ def render() -> None:
 
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Open", len(open_q))
-    k2.metric("Overdue first review", sum(x["overdue"] for x in open_q))
+    k2.metric("SLA overdue", sum(x["overdue"] for x in open_q))
     k3.metric("Open P0 / P1", sum(1 for x in open_q if x["effective_severity"] in ("P0", "P1")))
-    k4.metric("Awaiting severity decision", sum(1 for x in open_q if not x["human_severity"]))
+    k4.metric("Awaiting triage", sum(1 for x in open_q if not x["human_severity"]))
     k5.metric("Actions I can take", sum(1 for x in open_q for a in x["next_actions"] if wf.actor_can_do(c, me, a)))
 
     v, s, f = st.columns([3, 2, 1])
     view = v.segmented_control("View", VIEWS, default="Needs action", key="q_view", label_visibility="collapsed") or "Needs action"
     search = s.text_input("Search", placeholder="Search ID or title", label_visibility="collapsed", key="q_search")
     with f.popover("Filters", use_container_width=True):
+        phases = st.multiselect("Status", PHASES, key="q_phase",
+                                help=" · ".join(f"{k}: {v}" for k, v in PHASE_HELP.items()))
         sev = st.multiselect("Severity", ["P0", "P1", "P2", "P3"], key="q_sev")
-        stages = st.multiselect("Workflow stage", STAGES, key="q_stage",
-                                help="Intake → AI enrichment → Triage → Investigation → Containment → Response → Closure → QA")
         cats = sorted({cat for x in q for cat in x["categories"]})
         cat = st.multiselect("Category", cats, format_func=lambda k: CATEGORY_LABEL.get(k, k), key="q_cat")
         owners = sorted({x["owner"] for x in q if x["owner"]})
         owner = st.multiselect("Owner", ["(unassigned)"] + owners, format_func=lambda k: k if k == "(unassigned)" else actor_name(k), key="q_owner")
         review = st.radio("Mandatory review", ["Any", "Flagged", "Not flagged"], horizontal=True, key="q_review")
-        overdue_only = st.checkbox("Overdue only", key="q_overdue")
+        overdue_only = st.checkbox("SLA overdue only", key="q_overdue")
+        with st.expander("More filters"):
+            stages = st.multiselect("Stage", STAGES, key="q_stage",
+                                    help="Intake → AI assessment → Triage → Investigation → Containment → Response → Closure → QA review")
 
     def keep(x) -> bool:
         is_open = x["status"] in monitoring.OPEN
@@ -68,7 +73,9 @@ def render() -> None:
             return False
         if sev and x["effective_severity"] not in sev:
             return False
-        if stages and STAGES[STATUS_STAGE[x["status"]]] not in stages:
+        if phases and phase(x["status"]) not in phases:
+            return False
+        if stages and stage(x["status"]) not in stages:
             return False
         if cat and not set(cat) & set(x["categories"]):
             return False
@@ -94,19 +101,19 @@ def render() -> None:
         due = ""
         if is_open and not x["human_severity"]:
             due = ("⚠ " if x["overdue"] else "") + relative(x["minutes_to_deadline"])
+        status = phase(x["status"]) + (" ⏸️" if x["auto_paused"] else "") + (" ⚠️" if x["overdue"] and is_open else "")
         flags = []  # joined with spaces below
-        if x["auto_paused"]:
-            flags.append("⏸️")
         if x["mandatory_review"] and is_open and not x["human_severity"]:
             flags.append("⚑")
         if x["ai_source"] == "fault_injection":
             flags.append("🧪")
         rows.append({
             "Severity": f"{x['effective_severity']} {basis_short[x['severity_basis']]}",
-            "Flags": " ".join(flags),
             "ID": x["incident_id"],
             "Title": x["title"],
-            "Stage · status": f"{STATUS_STAGE[x['status']] + 1} · {STATUS_LABEL[x['status']]}",
+            "Status": status,
+            "Stage": STATUS_LABEL[x["status"]],
+            "Flags": " ".join(flags),
             "Next action": (("" if wf.actor_can_do(c, me, nxt) else "🔒 ") + nxt["title"]) if nxt else "—",
             "First review": due,
             "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
@@ -116,15 +123,18 @@ def render() -> None:
         st.markdown("""
 **Severity**: P0 critical · P1 high · P2 medium · P3 low
 - `P0 ✓` a person confirmed it
-- `P0 · AI` the AI's recommendation after safety controls, not yet confirmed
+- `P0 · AI` AI-suggested (after safety controls), not yet confirmed
 - `P0 · rules` the AI failed, so the deterministic rules' view is shown
 - `P1 · default` not assessed yet
 
-**Flags**: ⏸️ session paused automatically, waiting for a person · ⚑ a person must review · 🧪 fault-injection test data
+**Status**: Awaiting triage → In progress → Closed. ⏸️ auto-paused (C7), waiting for a specialist · ⚠️ SLA overdue
+
+**Stage**: the detail within the status, e.g. *Containment* or *Closed · QA pending*. Filter by stage under **Filters → More filters**.
+
+**Flags**: ⚑ mandatory review pending · 🧪 fault-injection test data
 
 **Next action**: 🔒 means your current role can't do it. Switch roles with *Working as* in the sidebar.
 
-**Stage**: where the case is in the eight-stage workflow. Filter by stage under **Filters**; change the order with the sort menu.
 """)
     if not rows:
         st.info("Nothing here. Try another view or clear the filters.")
@@ -137,12 +147,13 @@ def render() -> None:
         column_config={
             "Severity": st.column_config.TextColumn(width=86, help="✓ = human-confirmed. AI = recommendation after safety controls, not yet confirmed."),
             "ID": st.column_config.TextColumn(width=72),
-            "Title": st.column_config.TextColumn(width=250),
-            "Stage · status": st.column_config.TextColumn(width=148, help="Workflow stage 1–8 (Intake, AI enrichment, Triage, Investigation, Containment, Response, Closure, QA) and current status"),
+            "Title": st.column_config.TextColumn(width=230),
+            "Status": st.column_config.TextColumn(width=128, help="Awaiting triage · In progress · Closed. ⏸️ auto-paused (C7) · ⚠️ SLA overdue"),
+            "Stage": st.column_config.TextColumn(width=215, help="Detail within the status: Intake, AI assessment, Triage, Investigation, Containment, Response, Closure, QA review"),
             "Next action": st.column_config.TextColumn(width=186),
-            "First review": st.column_config.TextColumn(width=92, help="Time to the first-human-review target (prototype SLA assumptions)"),
+            "First review": st.column_config.TextColumn(width=92, help="SLA: time to the first human review target (prototype assumptions)"),
             "Owner": st.column_config.TextColumn(width=52),
-            "Flags": st.column_config.TextColumn(width=52, help="⏸️ session auto-paused (C7), confirm or lift · ⚑ mandatory human review pending · 🧪 fault-injection test data"),
+            "Flags": st.column_config.TextColumn(width=52, help="⚑ mandatory review pending · 🧪 fault-injection test data"),
         })
     sel = event.selection.rows if event and hasattr(event, "selection") else []
     if sel:

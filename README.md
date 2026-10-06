@@ -18,12 +18,12 @@ All data is synthetic, and every AI output shown comes from a labeled offline fi
 
 | | |
 | --- | --- |
-| **Queue, most urgent first.** A P0 child-safety case sits on top with ⏸️: its session was paused automatically and is waiting for a person. Severity is colour-coded and shows whether it is an unconfirmed AI recommendation or human-confirmed. Filter by workflow stage and sort by urgency, severity, stage or age. | **Automatic pause (C7), human decision.** For P0 CBRN or child-safety cases the session is paused at once; a Safety specialist or the Incident Lead must confirm or lift it. It never lifts itself. |
+| **Queue, most urgent first.** A P0 child-safety case sits on top with ⏸️: its session was paused automatically and is waiting for a person. Severity is colour-coded and shows whether it is AI-suggested or human-confirmed. Each case shows a high-level status (Awaiting triage, In progress, Closed) with its detailed stage beside it. Filter by status or stage, and sort by urgency, severity, status or age. | **Automatic pause (C7), human decision.** For P0 CBRN or child-safety cases the session is paused at once; a Safety specialist or the Incident Lead must confirm or lift it. It never lifts itself. |
 | ![Incident queue](docs/screenshots/01_queue.png) | ![Automatic pause awaiting review](docs/screenshots/02_auto_pause_awaiting_review.png) |
 | **The AI's claims shown next to their evidence.** The AI said P2; the safety controls raised it to P1 and kept the Legal/Privacy route. A claim citing evidence that doesn't exist is marked in red. | **People stay accountable.** A Risk Ops analyst cannot approve containment on a P0 case; the button is disabled and explains that the Incident Lead is needed. The service layer enforces the same rule. The action panel stays pinned beside the case file and scrolls on its own. |
 | ![AI assessment with cited evidence](docs/screenshots/04_ai_assessment_facts.png) | ![Containment needs Incident Lead](docs/screenshots/06_containment_needs_incident_lead.png) |
-| **Where every ticket is.** The dashboard charts tickets across the eight workflow stages (Intake → QA), split by severity. Stage and severity filters drive the chart and a sortable ticket list. | **Rule changes are tested before trust.** Switching to a revised rule version runs the regression gate on the frozen held-out cases. Here it finds no regression and, honestly, no improvement either. |
-| ![Dashboard: tickets by workflow stage](docs/screenshots/12_dashboard.png) | ![Regression check](docs/screenshots/11_regression_check.png) |
+| **Where every ticket is.** The dashboard charts tickets by status (Awaiting triage, In progress, Closed), split by severity, with counts of auto-paused, SLA-overdue and QA-pending cases. The eight-stage breakdown is one click away. | **Rule changes are tested before trust.** Switching to a revised rule version runs the regression gate on the frozen held-out cases. Here it finds no regression and, honestly, no improvement either. |
+| ![Dashboard: tickets by status](docs/screenshots/12_dashboard.png) | ![Regression check](docs/screenshots/11_regression_check.png) |
 
 More screenshots, covering the full demo, are in [`docs/screenshots/`](docs/screenshots/) and [`docs/demo_walkthrough.md`](docs/demo_walkthrough.md).
 
@@ -44,14 +44,15 @@ Everything runs offline. For the optional live model mode, copy `.env.example` t
 
 ### Using the interface
 
-* **Queue** (home page): the cases that need action, most urgent first, with colour-coded severity and each case's workflow stage. Click a row to open it. The **Filters** popover narrows by severity, workflow stage, category, owner or review flag. The **Sort** menu orders by urgency, severity, workflow stage or age. **How to read this** explains the symbols.
+* **Queue** (home page): the cases that need action, most urgent first, with colour-coded severity, each case's status (Awaiting triage, In progress, Closed) and its detailed stage. Click a row to open it. The **Filters** popover narrows by status, severity, category, owner, review flag or SLA; stage filtering is under *More filters*. The **Sort** menu orders by urgency, severity, status or age. **How to read this** explains the symbols.
 * **Case**: the whole case on one screen.
   * The **Next** panel says what the case needs and whether your role can do it.
   * The left side is the case file: the report, the AI assessment with each claim shown beside the evidence it cites, evidence, activity, related reports and AI details.
   * The right side holds the actions: the severity and routing decision, owner and stage, containment, draft communications, and closure. On desktop this panel stays pinned in view and scrolls on its own, so the actions stay beside the evidence you're reading. Controls your role can't use are disabled, with the reason shown.
 * **New report**: a structured form, or JSON import.
-* **Dashboard**: tickets by workflow stage (Intake → QA), split by severity, with stage and severity filters and a sortable list of the matching cases. Below that are timeliness, automatic pauses, overrides, categories and AI health.
-* **Quality & evaluation**, **Rules & playbooks**: evaluation results and rule governance.
+* **Dashboard**: tickets by status, split by severity, with status and severity filters, counts of auto-paused, SLA-overdue and QA-pending cases, a collapsible breakdown by stage, and a sortable list of the matching cases. Below that are timeliness, auto-pause, overrides, categories and AI health.
+* **Quality & evaluation**: four headline results for the active rules version, then tabs for *Results*, *Compare versions*, *Run evaluation*, *Human overrides* and *About & glossary* (caveats, limitations and every term defined).
+* **Rules & playbooks**: readable rules, governed rule changes with a regression check, safety controls, prompts and SLAs.
 * **Working as** (sidebar): switch between simulated roles to see the approval rules in action. This is not a login.
 
 | Task | Command |
@@ -73,7 +74,9 @@ The five-minute demo script is in [`docs/demo_walkthrough.md`](docs/demo_walkthr
 
 **The eight-stage workflow** is an explicit state machine (`riskops/workflow.py`). Every transition is validated, and every state change is written as an append-only event:
 
-`NEW` (1 Intake) → `ASSESSED` / `ASSESSMENT_FAILED` (2 AI enrichment) → `TRIAGED` (3 Human severity triage) → `INVESTIGATING` (4) → `CONTAINMENT` (5) → `RESPONSE` (6) → `CLOSED` (7, human sign-off) → `QA_REVIEWED` (8). New evidence on a closed case moves it to `REOPENED`.
+`NEW` (1 Intake) → `ASSESSED` / `ASSESSMENT_FAILED` (2 AI assessment) → `TRIAGED` (3 Human severity triage) → `INVESTIGATING` (4) → `CONTAINMENT` (5) → `RESPONSE` (6) → `CLOSED` (7, human sign-off) → `QA_REVIEWED` (8). New evidence on a closed case moves it to `REOPENED`.
+
+The interface groups these statuses into three phases for a quick read: **Awaiting triage** (`NEW`, `ASSESSED`, `ASSESSMENT_FAILED`, `REOPENED`), **In progress** (`TRIAGED`, `INVESTIGATING`, `CONTAINMENT`, `RESPONSE`) and **Closed** (`CLOSED`, `QA_REVIEWED`). The stage stays visible as detail.
 
 **Separation of concerns on every case**
 * *Potential impact* and *evidence quality / confidence* are assessed separately from severity.

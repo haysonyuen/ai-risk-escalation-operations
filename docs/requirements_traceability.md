@@ -42,5 +42,5 @@ The **Evidence** column points to code, tests (in `tests/`) or results (in `eval
 | 9 | At least three observed failure/correction examples; injected failures kept separate | `docs/evaluation.md` §5 and §4.2 | results artifacts | Six dev failures, eight held-out misses, plus fault-injection table |
 | 10 | Tests for the listed operational risks | `tests/` | 71 passed | Implemented |
 | 10 | App starts; browser interaction | `scripts/ui_smoke.py`, `scripts/ui_walkthrough.py` | All six pages and all case sections render without exceptions; full walkthrough (including confirming an automatic pause) completed in headless Chromium | Verified locally |
-| 11 | Seeded cases and a five-minute walkthrough | `data/demo/`, `seed.py`, `docs/demo_walkthrough.md` | 16 seeded cases; screenshots 01–13 | Implemented |
+| 11 | Seeded cases and a five-minute walkthrough | `data/demo/`, `seed.py`, `docs/demo_walkthrough.md` | 16 seeded cases; screenshots 01–14 | Implemented |
 | 12 | README, architecture, versioning, evaluation, walkthrough, case study, traceability, preserved framework | `README.md`, `docs/` | — | Implemented |

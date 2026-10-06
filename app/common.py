@@ -28,13 +28,35 @@ from riskops.schemas import TEAMS as SCHEMA_TEAMS  # noqa: E402
 # --------------------------------------------------------------------------- labels
 
 STATUS_LABEL = {
-    "NEW": "New · not assessed", "ASSESSED": "Awaiting triage", "ASSESSMENT_FAILED": "Awaiting triage · AI failed",
-    "TRIAGED": "Triaged", "INVESTIGATING": "Investigating", "CONTAINMENT": "Containment", "RESPONSE": "Response",
-    "CLOSED": "Closed", "REOPENED": "Reopened · re-triage", "QA_REVIEWED": "Closed · QA reviewed",
+    "NEW": "Intake · not yet assessed", "ASSESSED": "AI assessed · awaiting triage",
+    "ASSESSMENT_FAILED": "AI assessment failed · manual triage", "TRIAGED": "Triaged", "INVESTIGATING": "Investigating",
+    "CONTAINMENT": "Containment", "RESPONSE": "Response", "CLOSED": "Closed · QA pending",
+    "REOPENED": "Reopened · re-triage", "QA_REVIEWED": "Closed · QA reviewed",
 }
-STAGES = ["Intake", "AI enrichment", "Triage", "Investigation", "Containment", "Response", "Closure", "QA"]
+STAGES = ["Intake", "AI assessment", "Triage", "Investigation", "Containment", "Response", "Closure", "QA review"]
 STATUS_STAGE = {"NEW": 0, "ASSESSED": 1, "ASSESSMENT_FAILED": 1, "TRIAGED": 2, "REOPENED": 2, "INVESTIGATING": 3,
                 "CONTAINMENT": 4, "RESPONSE": 5, "CLOSED": 6, "QA_REVIEWED": 7}
+# Three high-level phases shown everywhere; the stage above is the detail underneath.
+PHASES = ["Awaiting triage", "In progress", "Closed"]
+STATUS_PHASE = {"NEW": 0, "ASSESSED": 0, "ASSESSMENT_FAILED": 0, "REOPENED": 0,
+                "TRIAGED": 1, "INVESTIGATING": 1, "CONTAINMENT": 1, "RESPONSE": 1, "CLOSED": 2, "QA_REVIEWED": 2}
+PHASE_HELP = {"Awaiting triage": "No human severity decision yet.",
+              "In progress": "Triaged and owned; investigation, containment or response under way.",
+              "Closed": "Signed off. QA review may still be pending."}
+PHASE_BADGE = {"Awaiting triage": "b-warn", "In progress": "b-p3", "Closed": "b-human"}
+STAGE_NEXT = {"NEW": "AI assessment", "ASSESSED": "Triage", "ASSESSMENT_FAILED": "Triage (manual)", "REOPENED": "Triage",
+              "TRIAGED": "Investigation", "INVESTIGATING": "Containment or Response", "CONTAINMENT": "Response",
+              "RESPONSE": "Closure", "CLOSED": "QA review", "QA_REVIEWED": None}
+
+
+def phase(status: str) -> str:
+    return PHASES[STATUS_PHASE[status]]
+
+
+def stage(status: str) -> str:
+    return STAGES[STATUS_STAGE[status]]
+
+
 ROUTE_LABEL = {"safety": "Safety", "child_safety": "Child Safety", "threat_intel": "Threat Intel",
                "product_security": "Product Security", "legal_privacy": "Legal/Privacy", "model_behavior": "Model Behavior",
                "product_engineering": "Product/Engineering", "product_ux": "Product/UX", "risk_ops": "Risk Ops", "support": "Support"}
@@ -58,14 +80,18 @@ CONTAINMENT_LABEL = {
     "account_lockout": "Suspend account (irreversible)", "file_mandatory_report": "Prepare mandatory external report (irreversible)",
 }
 SOURCE_LABEL = {
-    "offline_fixture": ("Offline fixture · not a model", "b-fixture"),
-    "offline_simulation": ("Offline simulation · not a model", "b-sim"),
+    "offline_fixture": ("Demo AI (pre-written, no live model)", "b-fixture"),
+    "offline_simulation": ("Demo AI (simulated, no live model)", "b-sim"),
     "live_model": ("Live model", "b-live"),
-    "fault_injection": ("Fault injection test", "b-fault"),
+    "fault_injection": ("Fault injection (AI deliberately broken)", "b-fault"),
     "none": ("Not assessed", "b-muted"),
 }
-BASIS_LABEL = {"human": "confirmed", "ai_after_controls": "AI · unconfirmed",
-               "rules_after_ai_failure": "rules · AI failed", "unassessed_default": "default · unassessed"}
+BASIS_LABEL = {"human": "confirmed", "ai_after_controls": "AI-suggested · not confirmed",
+               "rules_after_ai_failure": "rules · AI failed", "unassessed_default": "default · not assessed"}
+CONTROL_NAME = {
+    "C1": "Unusable AI output", "C2": "Missing evidence", "C3": "Severity floor", "C4": "Embedded instructions",
+    "C5": "Low-confidence review", "C6": "Specialist route", "C7": "Auto-pause",
+}
 CONTROL_TEXT = {
     "C1": "AI output unusable; no assessment was invented",
     "C2": "Cites evidence that does not exist",
@@ -73,14 +99,70 @@ CONTROL_TEXT = {
     "C4": "Report text contains instructions aimed at the reviewer (ignored)",
     "C5": "High potential impact but low confidence",
     "C6": "Specialist route kept",
-    "C7": "Session paused automatically (P0 CBRN / child safety) — a person must confirm or lift",
+    "C7": "Session paused automatically (P0 CBRN / child safety); a person must confirm or lift",
 }
+
+
+def control_name(cid: str) -> str:
+    """Name first, code second, e.g. 'Severity floor (C3)'."""
+    return f"{CONTROL_NAME[cid]} ({cid})" if cid in CONTROL_NAME else cid
+
+
+GLOSSARY = {
+    "Escalation and response": [
+        ("P0–P3", "Severity. P0 critical, P1 high, P2 medium, P3 low."),
+        ("Triage", "A person sets severity and the owning team (route). Until then the case is *Awaiting triage*."),
+        ("Containment", "Steps that limit ongoing harm, e.g. pausing a session or rotating credentials. All simulated here."),
+        ("Response", "Communication with the affected user or customer. Drafts only; nothing is sent."),
+        ("Closure", "Human sign-off that the case is resolved."),
+        ("QA review", "A second person reviews a closed case and records lessons."),
+        ("Route / owning team", "The team that owns the case, e.g. Safety, Child Safety, Product Security."),
+        ("SLA", "Target time for the first human review (prototype assumptions)."),
+        ("Mandatory review", "The case must be reviewed by a person before any decision; the AI cannot clear it."),
+        ("Override", "A person's decision that differs from the AI recommendation, with a reason code."),
+        ("Incident Lead", "Senior role that approves irreversible containment and reviews overdue pauses."),
+    ],
+    "Pipeline": [
+        ("AI recommendation", "Severity and route suggested by the AI assessment, before any checks."),
+        ("Safety controls", "Fixed checks applied after the AI: " + "; ".join(f"{control_name(k)}" for k in CONTROL_NAME)
+         + ". They can raise severity or force review, never lower it."),
+        ("Auto-pause (C7)", "P0 CBRN or child-safety cases pause the reported session automatically. "
+                            "A Safety specialist or the Incident Lead must confirm or lift it; it never lifts itself."),
+        ("Rules version", "The versioned rulebook that sets a minimum severity from warning signs in the report."),
+        ("Demo AI", "Pre-written or simulated assessments; no live model is called in this demo."),
+    ],
+    "Evaluation": [
+        ("Dev set / held-out set", "Dev cases (44) were used to tune the rules. Held-out cases (36) were frozen beforehand and never used for tuning."),
+        ("Recall / precision", "Recall: share of real P0/P1 cases that were caught. Precision: share of P0/P1 calls that were right."),
+        ("Fault injection", "A test that deliberately breaks the AI (timeouts, garbage, invented evidence) to check the safety controls still hold."),
+        ("Regression gate", "Fails a change if a safety-critical metric drops at all, or another metric drops by more than 5 points."),
+    ],
+}
+
+
+def ver(v: str | None) -> str:
+    """'rules-v2.1' → 'v2.1'; 'rules-v2.1-fault-demo' → 'v2.1 fault demo'."""
+    v = str(v or "")
+    return v.split("-", 1)[1].replace("-", " ") if "-" in v else v
+
+
+def phase_badge(status: str) -> str:
+    p = phase(status)
+    return f'<span class="badge {PHASE_BADGE[p]}" title="{esc(PHASE_HELP[p])}">{esc(p)}</span>'
+
+
 FIELD_LABEL = {
     "product_surface": "Product surface", "customer_type": "Customer", "reporter_channel": "Channel",
     "model_version": "Model version", "file_action": "File action", "external_action_attempted": "External action",
     "user_approved": "User approved", "sensitive_data": "Sensitive data", "scope": "Scope", "recurrence": "Recurrence",
     "reversibility": "Reversibility",
 }
+SPLIT_NAME = {"dev": "Dev set", "held_out": "Held-out set", "all": "All cases"}
+SPLIT_HELP = {"dev": "used for tuning", "held_out": "frozen, never used for tuning", "all": "dev + held-out"}
+GATE_LABEL = {"P0/P1 recall (after controls)": "P0/P1 recall", "Mandatory review compliance": "Mandatory review flagged when needed",
+              "Severity within acceptable range": "Severity within range", "Primary route acceptable": "Route acceptable",
+              "Schema-valid rate": "Valid AI output", "C7 auto-pause recall": "Auto-pause (C7) recall"}
+OVERRIDE_DIRECTION = {"raised": "Raised severity", "lowered": "Lowered severity", "route_only": "Route only (owning team changed)"}
 TEAMS = SCHEMA_TEAMS
 EVIDENCE_TYPES = ["reporter_statement", "conversation_excerpt", "tool_action_log", "file_diff", "approval_event",
                   "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note",
@@ -172,9 +254,13 @@ def source_badge(kind: str | None) -> str:
 
 
 def stepper(status: str) -> str:
-    cur = STATUS_STAGE[status]
-    cells = "".join(f'<div class="{"cur" if i == cur else "done" if i < cur else ""}">{i + 1}. {s}</div>' for i, s in enumerate(STAGES))
-    return f'<div class="stepper">{cells}</div>'
+    """Three-phase bar with the current stage underneath (the detail)."""
+    cur = STATUS_PHASE[status]
+    cells = "".join(f'<div class="{"cur" if i == cur else "done" if i < cur else ""}" title="{esc(PHASE_HELP[p])}">{p}</div>'
+                    for i, p in enumerate(PHASES))
+    nxt = STAGE_NEXT[status]
+    line = f"Stage {STATUS_STAGE[status] + 1} of 8: <b>{esc(STATUS_LABEL[status])}</b>" + (f" · next: {esc(nxt)}" if nxt else "")
+    return f'<div class="stepper">{cells}</div><div class="small" style="margin:-4px 0 10px 0">{line}</div>'
 
 
 def relative(minutes: float | None) -> str:
@@ -182,7 +268,7 @@ def relative(minutes: float | None) -> str:
         return ""
     m = abs(int(minutes))
     txt = f"{m // 1440}d {m % 1440 // 60}h" if m >= 1440 else f"{m // 60}h {m % 60}m" if m >= 60 else f"{m}m"
-    return f"overdue {txt}" if minutes < 0 else f"due in {txt}"
+    return f"overdue by {txt}" if minutes < 0 else f"due in {txt}"
 
 
 def ago(ts: str | None) -> str:
@@ -338,6 +424,19 @@ def show_toasts() -> None:
         st.toast(t, icon="✅")
 
 
+def drop_stale(key: str, options: list) -> None:
+    """Forget a remembered widget value that is no longer a valid option (e.g. after labels were renamed)."""
+    v = st.session_state.get(key)
+    if v is None:
+        return
+    if isinstance(v, list):
+        keep = [x for x in v if x in options]
+        if keep != v:
+            st.session_state[key] = keep
+    elif v not in options:
+        del st.session_state[key]
+
+
 def section(labels: list[str], key: str) -> str:
     """Stateful section switcher (keyed widget state survives form submissions and reruns)."""
     if st.session_state.get(key) not in labels:
@@ -378,7 +477,8 @@ def describe_event(e: dict) -> str:
         return (f"{who} <b>overrode</b> the AI ({ai.get('severity')} → {ROUTE_LABEL.get(ai.get('route'), ai.get('route'))}) with "
                 f"<b>{nv['severity']}</b> → {ROUTE_LABEL.get(nv['route'], nv['route'])} · {pretty(details.get('override_reason_code'))}{reason}")
     if t == "status_change":
-        return f"{who} moved the case to <b>{STATUS_LABEL.get(new, new)}</b>{reason}"
+        # history: say "Closed", not the current-state hint "Closed · QA pending"
+        return f"{who} moved the case to <b>{'Closed' if new == 'CLOSED' else STATUS_LABEL.get(new, new)}</b>{reason}"
     if t == "owner_assigned":
         return f"{who} assigned owner <b>{esc(actor_name(new))}</b>{reason}"
     if t == "investigation_note":
@@ -388,7 +488,7 @@ def describe_event(e: dict) -> str:
     if t == "containment_proposed":
         return f"{who} proposed containment <b>{action_label(nv['action_type'])}</b> on {esc(nv['target'])} [simulated]"
     if t == "auto_hold_applied":
-        return (f"<b>⏸ C7 automatic pause</b> applied to {esc(pretty(details.get('action_type', '')))} — {esc(e['reason'] or '')}"
+        return (f"<b>⏸️ Auto-pause (C7)</b> applied to {esc(pretty(details.get('action_type', '')))} — {esc(e['reason'] or '')}"
                 f" [simulated · awaiting human review]")
     if t in ("auto_hold_confirmed", "auto_hold_lifted"):
         return f"{who} <b>{'confirmed' if t.endswith('confirmed') else 'lifted'}</b> the automatic pause [simulated]{reason}"

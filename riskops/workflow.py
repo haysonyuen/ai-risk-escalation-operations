@@ -110,10 +110,10 @@ def require(actor: Actor, permission: str) -> None:
 STATUSES = ["NEW", "ASSESSED", "ASSESSMENT_FAILED", "TRIAGED", "INVESTIGATING", "CONTAINMENT",
             "RESPONSE", "CLOSED", "REOPENED", "QA_REVIEWED"]
 STAGE = {
-    "NEW": "1 Intake", "ASSESSED": "2 AI enrichment", "ASSESSMENT_FAILED": "2 AI enrichment (failed → manual)",
+    "NEW": "1 Intake", "ASSESSED": "2 AI assessment", "ASSESSMENT_FAILED": "2 AI assessment (failed → manual triage)",
     "TRIAGED": "3 Human severity triage", "INVESTIGATING": "4 Investigation", "CONTAINMENT": "5 Escalation & containment",
     "RESPONSE": "6 User/customer response", "CLOSED": "7 Resolution & closure", "REOPENED": "3 Re-triage (reopened)",
-    "QA_REVIEWED": "8 Quality review & learning",
+    "QA_REVIEWED": "8 QA review & learning",
 }
 # (from, to): how the transition may happen
 TRANSITIONS: dict[tuple[str, str], str] = {
@@ -911,7 +911,7 @@ def next_actions(conn, incident_id: str) -> list[dict]:
     for h in pending_auto_holds(conn, incident_id):
         overdue = h["review_by"] <= now
         add("Confirm or lift the automatic pause" + (" — OVERDUE, escalated to Incident Lead" if overdue else ""),
-            f"C7 paused {h['target']}. It stays paused until a person decides.", "review_auto_hold", urgent=True)
+            f"Auto-pause (C7) paused {h['target']}. It stays paused until the Safety specialist or Incident Lead confirms or lifts it.", "review_auto_hold", urgent=True)
     if st == "NEW":
         add("Run the AI assessment", "Or record a severity decision manually.", "run_assessment")
     if st in ("NEW", "ASSESSED", "ASSESSMENT_FAILED", "REOPENED"):
