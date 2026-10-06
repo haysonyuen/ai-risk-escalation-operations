@@ -5,54 +5,58 @@ import json
 import pandas as pd
 import streamlit as st
 
-from common import CATEGORY_LABEL, STAGES, STATUS_LABEL, STATUS_STAGE, actor_name, conn, go, go_case, pretty
-from riskops import config, monitoring
+from common import (CATEGORY_LABEL, OVERRIDE_DIRECTION, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE,
+                    actor_name, conn, go, go_case, phase, pretty, stage, ver, GATE_LABEL, SOURCE_LABEL, SPLIT_NAME)
+from riskops import config, monitoring, workflow as wf
 from riskops.db import get_setting, rows
 
 
 SEV_COLORS = {"P0": "#c0392b", "P1": "#e67e22", "P2": "#d4ac0d", "P3": "#95a5a6"}
 
 
-def _stage_section() -> None:
-    """Where tickets are in the eight-stage workflow, by severity, with a stage filter and a case list."""
+def _bar(counts: pd.DataFrame, field: str, order: list[str], height: int):
     import altair as alt
-    st.subheader("Tickets by workflow stage")
+    return (alt.Chart(counts).mark_bar()
+            .encode(x=alt.X(f"{field}:N", sort=order, scale=alt.Scale(domain=order), title=None,
+                            axis=alt.Axis(labelAngle=0, labelLimit=120)),
+                    y=alt.Y("sum(Tickets):Q", title="Tickets", axis=alt.Axis(tickMinStep=1)),
+                    color=alt.Color("Severity:N", scale=alt.Scale(domain=list(SEV_COLORS), range=list(SEV_COLORS.values())),
+                                    legend=alt.Legend(orient="top", title=None)),
+                    order=alt.Order("Severity:N", sort="ascending"),
+                    tooltip=[field, "Severity", "Tickets"])
+            .properties(height=height))
+
+
+def _status_section() -> None:
+    """Tickets by status (three phases), by severity, with filters and a case list. Stage detail is collapsed below."""
+    st.subheader("Tickets by status")
     q = monitoring.queue(conn())
-    picked = st.pills("Stages", STAGES, selection_mode="multi", default=STAGES, key="d_stages",
-                      help="Click to filter the chart and the list below by workflow stage") or []
-    f2, f3 = st.columns([3, 2], vertical_alignment="bottom")
-    with f2:
-        sevs = st.pills("Severity", ["P0", "P1", "P2", "P3"], selection_mode="multi", default=["P0", "P1", "P2", "P3"], key="d_sevs") or []
-    include_closed = f3.toggle("Include closed cases", value=True, key="d_closed", help="Closure and QA stages hold closed cases")
-    data = [{"Stage": STAGES[STATUS_STAGE[x["status"]]], "Order": STATUS_STAGE[x["status"]], "Severity": x["effective_severity"],
-             "x": x} for x in q
-            if STAGES[STATUS_STAGE[x["status"]]] in picked and x["effective_severity"] in sevs
-            and (include_closed or x["status"] in monitoring.OPEN)]
-    if not data:
+    picked = st.pills("Status", PHASES, selection_mode="multi", default=PHASES, key="d_phases",
+                      help=" · ".join(f"{k}: {v}" for k, v in PHASE_HELP.items())) or []
+    sevs = st.pills("Severity", ["P0", "P1", "P2", "P3"], selection_mode="multi", default=["P0", "P1", "P2", "P3"], key="d_sevs") or []
+    items = [x for x in q if phase(x["status"]) in picked and x["effective_severity"] in sevs]
+    open_items = [x for x in items if x["status"] in monitoring.OPEN]
+    k1, k2, k3 = st.columns(3)
+    k1.metric("⏸️ Auto-paused (C7)", sum(1 for x in items if x["auto_paused"]), help="Waiting for the Safety specialist or Incident Lead")
+    k2.metric("⚠️ SLA overdue", sum(1 for x in open_items if x["overdue"]), help="Open cases past the first-review target")
+    k3.metric("Closed · QA pending", sum(1 for x in items if x["status"] == "CLOSED"), help="Closed cases not yet QA reviewed")
+    if not items:
         st.info("No tickets match these filters.")
         return
-    df = pd.DataFrame([{k: v for k, v in d.items() if k != "x"} for d in data])
-    counts = df.groupby(["Stage", "Order", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
-    order = [s for s in STAGES if s in picked]
-    chart = (alt.Chart(counts).mark_bar()
-             .encode(x=alt.X("Stage:N", sort=order, scale=alt.Scale(domain=order), title=None,
-                             axis=alt.Axis(labelAngle=0, labelLimit=120)),
-                     y=alt.Y("sum(Tickets):Q", title="Tickets", axis=alt.Axis(tickMinStep=1)),
-                     color=alt.Color("Severity:N", scale=alt.Scale(domain=list(SEV_COLORS), range=list(SEV_COLORS.values())),
-                                     legend=alt.Legend(orient="top", title=None)),
-                     order=alt.Order("Severity:N", sort="ascending"),
-                     tooltip=["Stage", "Severity", "Tickets"])
-             .properties(height=260))
-    st.altair_chart(chart, use_container_width=True)
+    df = pd.DataFrame([{"Status": phase(x["status"]), "Stage": stage(x["status"]), "Severity": x["effective_severity"]} for x in items])
+    by_phase = df.groupby(["Status", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
+    st.altair_chart(_bar(by_phase, "Status", [p for p in PHASES if p in picked], 240), use_container_width=True)
+    with st.expander("Breakdown by stage"):
+        by_stage = df.groupby(["Stage", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
+        st.altair_chart(_bar(by_stage, "Stage", [s for s in STAGES if s in set(df["Stage"])], 240), use_container_width=True)
 
-    items = [d["x"] for d in data]
     table = pd.DataFrame([{
         "ID": x["incident_id"], "Severity": x["effective_severity"] + (" ✓" if x["severity_basis"] == "human" else " · AI"),
-        "Stage": f"{STATUS_STAGE[x['status']] + 1} · {STAGES[STATUS_STAGE[x['status']]]}", "Status": STATUS_LABEL[x["status"]],
+        "Status": phase(x["status"]) + (" ⏸️" if x["auto_paused"] else ""), "Stage": STATUS_LABEL[x["status"]],
         "Title": x["title"], "Age (h)": x["age_hours"], "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
         "Next action": x["next_actions"][0]["title"] if x["next_actions"] else "—"} for x in sorted(
-            items, key=lambda x: (STATUS_STAGE[x["status"]], {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[x["effective_severity"]]))])
-    st.caption(f"{len(table)} ticket(s) in the selected stages · click a column header to sort · click a row to open the case")
+            items, key=lambda x: (STATUS_PHASE[x["status"]], STATUS_STAGE[x["status"]], {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[x["effective_severity"]]))])
+    st.caption(f"{len(table)} ticket(s) · click a column header to sort · click a row to open the case")
     ev = st.dataframe(table, hide_index=True, use_container_width=True, on_select="rerun", selection_mode="single-row",
                       key=f"d_table_{st.session_state.get('d_nonce', 0)}", height=min(36 * (len(table) + 1) + 4, 420),
                       column_config={"Age (h)": st.column_config.NumberColumn(format="%.1f", width=70),
@@ -79,14 +83,15 @@ def _quality_alerts() -> None:
         if base and cand and active != config.BASELINE_RULE_VERSION:
             chk = monitoring.regression_check(base[-1], cand[-1])
             shown = True
-            label = " (simulated degradation — fault-injection rule set)" if "fault" in active else " (synthetic evaluation data, not production drift)"
+            label = " (simulated degradation: fault-demo rule set)" if "fault" in active else " (synthetic test cases, not production drift)"
+            where = f"{SPLIT_NAME[split]} · active Rules {ver(active)} vs baseline Rules {ver(config.BASELINE_RULE_VERSION)}"
             if chk["alert"]:
-                st.error(f"**Quality alert · {pretty(split)} split** — active rules {active} vs baseline {config.BASELINE_RULE_VERSION}: "
-                         + "; ".join(f"{x['metric']} {x['baseline']:.0%} → {x['candidate']:.0%}" for x in chk["regressions"]) + label)
+                st.error(f"**Quality alert · {where}**: "
+                         + "; ".join(f"{GATE_LABEL.get(x['metric'], x['metric'])} {x['baseline']:.0%} → {x['candidate']:.0%}" for x in chk["regressions"]) + label)
             else:
-                st.success(f"{pretty(split)} split: active rules {active} show no regression vs {config.BASELINE_RULE_VERSION}{label}")
+                st.success(f"{where}: no regression{label}")
     if not shown:
-        st.caption(f"Quality gate: active rules **{active}** — no comparison needed or no comparable runs yet.")
+        st.caption(f"Regression gate: active Rules **{ver(active)}**. No comparison needed, or no comparable runs yet.")
 
 
 def render() -> None:
@@ -97,15 +102,15 @@ def render() -> None:
     m = monitoring.ops_metrics(conn())
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Open cases", m["queue_volume_open"])
-    k2.metric("Overdue first review", m["overdue_open"])
-    k3.metric("Waiting on a human decision", m["pending_human_decisions"])
+    k2.metric("SLA overdue", m["overdue_open"])
+    k3.metric("Awaiting a human decision", m["pending_human_decisions"])
     k4.metric("Median open age", f"{m['open_age_hours']['median_min'] / 60:.1f} h" if m["open_age_hours"]["median_min"] else "—")
     if m["overdue_open"] and st.button("View overdue cases in the queue"):
         st.session_state["q_view"] = "All open"
         st.session_state["q_overdue"] = True
         go("queue")
 
-    _stage_section()
+    _status_section()
 
     st.subheader("Timeliness")
     s = m["sla"]
@@ -118,7 +123,7 @@ def render() -> None:
          "SLA breaches": f"{s['containment_breaches']} of {s['containment_evaluated']}"},
     ]), hide_index=True, use_container_width=True)
 
-    st.subheader("Automatic pauses (C7)")
+    st.subheader("Auto-pause (C7)")
     h = m["auto_hold"]
     st.caption("P0 CBRN and child-safety cases pause the reported session automatically; a person must confirm or lift the pause. "
                "Simulated — nothing is paused in any real system.")
@@ -136,10 +141,9 @@ def render() -> None:
         st.subheader("Human oversight")
         o = m["overrides"]
         st.markdown(f"**{o['overrides']}** of **{o['decisions_with_ai_recommendation']}** decisions overrode the AI recommendation")
-        st.dataframe(pd.DataFrame([{"Override reason": pretty(k), "Count": v} for k, v in o["by_reason"].items()] or [{"Override reason": "none", "Count": 0}]),
-                     hide_index=True, use_container_width=True)
-        dir_label = {"raised": "severity raised", "lowered": "severity lowered", "route_only": "only the owning team changed"}
-        st.caption("Direction: " + (" · ".join(f"{dir_label.get(k, pretty(k))}: {v}" for k, v in o["by_direction"].items()) or "—"))
+        st.dataframe(pd.DataFrame([{"Override reason": wf.OVERRIDE_REASONS.get(k, pretty(k)), "Count": v} for k, v in o["by_reason"].items()]
+                                  or [{"Override reason": "none", "Count": 0}]), hide_index=True, use_container_width=True)
+        st.caption("Direction: " + (" · ".join(f"{OVERRIDE_DIRECTION.get(k, pretty(k))}: {v}" for k, v in o["by_direction"].items()) or "—"))
     with b:
         st.subheader("Issue categories")
         st.caption("Counts only — there is no usage denominator, so no recurrence rates.")
@@ -158,10 +162,10 @@ def render() -> None:
     f1, f2 = st.columns(2)
     with f1:
         st.markdown("**Failures** (routed to manual review)")
-        st.dataframe(pd.DataFrame([{"Error": pretty(x["error_kind"]), "Source": pretty(x["provider_kind"]), "Count": x["n"]} for x in m["assessment_failures"]]
+        st.dataframe(pd.DataFrame([{"Error": pretty(x["error_kind"]), "Source": SOURCE_LABEL.get(x["provider_kind"], (pretty(x["provider_kind"]),))[0], "Count": x["n"]} for x in m["assessment_failures"]]
                                   or [{"Error": "none", "Source": "", "Count": 0}]), hide_index=True, use_container_width=True)
     with f2:
         st.markdown("**By version**")
-        st.dataframe(pd.DataFrame([{"Rules": x["rule_version"], "Prompt": x["prompt_version"], "Source": pretty(x["provider_kind"]),
+        st.dataframe(pd.DataFrame([{"Rules": ver(x["rule_version"]), "Prompt": ver(x["prompt_version"]), "Source": SOURCE_LABEL.get(x["provider_kind"], (pretty(x["provider_kind"]),))[0],
                                     "Assessments": x["n"], "Failed": x["failed"], "Flagged for review": x["flagged"]} for x in m["assessments_by_version"]]),
                      hide_index=True, use_container_width=True)

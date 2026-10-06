@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from common import section, badge, conn, current_actor, flash, md, run_action
+from common import GATE_LABEL, SPLIT_NAME, section, badge, conn, current_actor, flash, md, run_action, ver
 from riskops import config, evaluation, monitoring, workflow as wf
 from riskops.assessment import CONTROLS_VERSION
 from riskops.db import get_setting, rows
@@ -27,8 +27,8 @@ def render() -> None:
         st.warning(f"The stored active rule version `{active}` is no longer available (archived). "
                    f"Showing `{versions[0]}`. Use **Reset demo data** in the sidebar to rebuild the demo data.")
         active = versions[0]
-    md(f"Active rule version: {badge(active, 'b-rules')} · controls {badge(CONTROLS_VERSION, 'b-muted')} · "
-       f"prompt {badge(get_setting(c, 'active_prompt_version'), 'b-muted')}")
+    md(f"Active: {badge('Rules ' + ver(active), 'b-rules')} · {badge('safety controls ' + ver(CONTROLS_VERSION), 'b-muted')} · "
+       f"{badge('prompt ' + ver(get_setting(c, 'active_prompt_version')), 'b-muted')}")
     _labels = ["Readable rules", "Change rules + regression check", "Controls, prompts & SLA", "Severity framework"]
     sec = section(_labels, key="r_section")
     if sec == _labels[0]:
@@ -75,7 +75,7 @@ def render() -> None:
         a1, a2, a3 = st.columns(3)
         base_v = a1.selectbox("Baseline", versions, index=versions.index(config.BASELINE_RULE_VERSION) if config.BASELINE_RULE_VERSION in versions else 0)
         cand_v = a2.selectbox("Candidate", versions, index=versions.index(active))
-        split = a3.selectbox("Split", ["held_out", "dev", "all"])
+        split = a3.selectbox("Case set", ["held_out", "dev", "all"], format_func=SPLIT_NAME.get)
         if st.button("Run regression check"):
             with st.spinner("Running both versions…"):
                 sb = evaluation.run_eval("rules", base_v, split=split, label=f"regression baseline {base_v} on {split}", out_dir=config.RESULTS_DIR / "ui_runs")
@@ -88,33 +88,33 @@ def render() -> None:
         chk = st.session_state.get("last_regression")
         if chk:
             (st.error if chk["alert"] else st.success)(
-                ("QUALITY ALERT — regression detected: " + "; ".join(f"{x['metric']} {x['baseline']:.1%} → {x['candidate']:.1%}" for x in chk["regressions"]))
-                if chk["alert"] else "No gated metric regressed.")
-            st.caption(chk["label"] + " A fault-demo rule set produces SIMULATED degradation.")
+                ("Regression: " + "; ".join(f"{GATE_LABEL.get(x['metric'], x['metric'])} {x['baseline']:.0%} → {x['candidate']:.0%}" for x in chk["regressions"]))
+                if chk["alert"] else "No regression on the gated metrics.")
+            st.caption("Synthetic test cases with provisional labels, not production monitoring. The fault-demo rule set degrades results on purpose.")
             if chk["improvements"]:
-                st.caption("Improved: " + "; ".join(f"{x['metric']} {x['baseline']:.1%} → {x['candidate']:.1%}" for x in chk["improvements"]))
+                st.caption("Improved: " + "; ".join(f"{GATE_LABEL.get(x['metric'], x['metric'])} {x['baseline']:.0%} → {x['candidate']:.0%}" for x in chk["improvements"]))
             if chk["newly_failing_cases"]:
-                st.markdown("Newly failing cases")
-                st.dataframe(pd.DataFrame([{k: (", ".join(v) if isinstance(v, list) else v) for k, v in f.items()} for f in chk["newly_failing_cases"]]),
-                             use_container_width=True, hide_index=True)
+                from view_quality import _failure_rows
+                st.markdown("Now failing")
+                st.dataframe(_failure_rows(chk["newly_failing_cases"]), use_container_width=True, hide_index=True)
             if chk["fixed_cases"]:
-                st.caption("Fixed: " + ", ".join(f["incident_id"] for f in chk["fixed_cases"]))
+                st.caption("Now passing: " + ", ".join(f["incident_id"] for f in chk["fixed_cases"]))
         ev = rows(c, "SELECT ts, actor_id, previous_value, new_value, reason FROM events WHERE event_type='rule_version_changed' ORDER BY event_id DESC")
         if ev:
             st.markdown("**Rule change log**")
             st.dataframe(pd.DataFrame(ev), use_container_width=True, hide_index=True)
     elif sec == _labels[2]:
-        st.markdown(f"**Always-on deterministic controls ({CONTROLS_VERSION})** — independent of rule version")
+        st.markdown(f"**Always-on safety controls ({ver(CONTROLS_VERSION)})**: fixed checks applied after the AI, independent of rules version")
         st.markdown("""
-| ID | Control |
+| Control | What it does |
 | --- | --- |
-| C1 | Provider failure, malformed output or schema-invalid output → no assessment is invented; case routed to manual review (rules recommendation shown, labeled) |
-| C2 | Every cited evidence ID must exist in the case; invalid references are flagged |
-| C3 | Provider severity below the rules recommendation is raised to it (controls never lower severity) |
-| C4 | Instructions embedded in report text are flagged for review and never followed |
-| C5 | Low confidence on a potentially high/critical-impact case → mandatory review (low confidence ≠ low severity) |
-| C6 | A different route than a specialist route (Safety, Child Safety, Threat Intel, Legal/Privacy, Product Security) → specialist route kept and flagged |
-| C7 | P0 recommendation in **CBRN or child safety** (from the rules *or* the AI) → the reported session is paused automatically (simulated). A Safety specialist or the Incident Lead must confirm or lift it; lifting needs a written reason. It never lifts itself: past its review time it escalates to the Incident Lead. Anything stronger (account suspension, mandatory external report) stays a human decision |
+| **Unusable AI output** (C1) | AI failure, malformed output or schema-invalid output → no assessment is invented; case routed to manual review (rules recommendation shown, labeled) |
+| **Missing evidence** (C2) | Every cited evidence ID must exist in the case; invalid references are flagged |
+| **Severity floor** (C3) | AI severity below the rules recommendation is raised to it (controls never lower severity) |
+| **Embedded instructions** (C4) | Instructions embedded in report text are flagged for review and never followed |
+| **Low-confidence review** (C5) | Low confidence on a potentially high/critical-impact case → mandatory review (low confidence ≠ low severity) |
+| **Specialist route** (C6) | A different route than a specialist route (Safety, Child Safety, Threat Intel, Legal/Privacy, Product Security) → specialist route kept and flagged |
+| **Auto-pause** (C7) | P0 recommendation in **CBRN or child safety** (from the rules *or* the AI) → the reported session is paused automatically (simulated). A Safety specialist or the Incident Lead must confirm or lift it; lifting needs a written reason. It never lifts itself: past its review time it escalates to the Incident Lead. Anything stronger (account suspension, mandatory external report) stays a human decision |
 """)
         st.markdown("**Prompt versions** (used only in live mode)")
         pv = st.selectbox("Prompt", sorted(p.stem for p in config.PROMPT_DIR.glob("prompt-v*.md")))

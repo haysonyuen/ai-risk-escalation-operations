@@ -24,7 +24,7 @@ The 16 demo cases cover frontier-lab harm areas: CBRN, child safety, self-harm, 
 ### 0b. The automatic pause (C7) (40 s): `02_auto_pause_awaiting_review.png`
 Open **INC-1002** and switch *Working as* to **Priya (Safety & Child Safety Specialist)**.
 * Both the rules and the AI rate the case **P0 child safety**, so control C7 paused the reported session the moment it was assessed. No human approval was needed for this one narrow, reversible step.
-* The **Containment** card shows **⏸️ AUTO-PAUSED · C7** with a review deadline (60 minutes). The pause **never lifts itself**: past the deadline the case is marked overdue and escalated to the Incident Lead.
+* The **Containment** card shows **⏸️ Auto-paused (C7)** with a review deadline (60 minutes). The pause **never lifts itself**: past the deadline the case is marked overdue and escalated to the Incident Lead.
 * Enter a reason and click **Confirm pause** (or **Lift pause**, which needs 20+ characters). Risk Ops cannot do either. Stronger actions, such as suspending the account or preparing the mandatory external report, are separate human proposals that the Incident Lead must approve.
 * INC-1001 (CBRN) shows the next state: a pause already confirmed by the specialist, a human-confirmed P0, and an approved classifier block.
 
@@ -80,7 +80,7 @@ As Sam:
 *Rules & playbooks* → **Change rules + regression check**.
 1. As Sam, switch the active version to **rules-v2.1** with a rationale. The change is logged and does not touch existing assessments or decisions.
 2. Click **Run regression check** (baseline v2.0 against v2.1 on the **frozen held-out** split).
-* Result: **No gated metric regressed.** This is the honest story: v2.1 fixed all six dev failures but made **no difference to held-out severity** (30/36 for both). Tuning on the development split did not generalize, and the held-out set shows that.
-* For a **simulated degradation** demo, choose `rules-v2.1-fault-demo` as the candidate. It removes the P0 child-safety rule and the P0/P1 review condition. The gate raises a **QUALITY ALERT** because automatic-pause recall and review compliance drop.
+* Result: **No regression on the gated metrics.** This is the honest story: v2.1 fixed all six dev failures but made **no difference to held-out severity** (30/36 for both). Tuning on the development split did not generalize, and the held-out set shows that.
+* For a **simulated degradation** demo, choose `rules-v2.1-fault-demo` as the candidate. It removes the P0 child-safety rule and the P0/P1 review condition. The gate reports a **Regression** because automatic-pause recall and review compliance drop.
 * The **Dashboard** shows the automatic-pause panel (applied, awaiting a person, confirmed/lifted, and the lifted share as a false-alarm signal), timeliness, overrides and categories.
-* Finish on *Quality & evaluation*: runs with denominators, confusion matrices, the category and C7 metrics, the failure list, and the limitations banner. Live-model evaluation is shown as **pending**.
+* Finish on *Quality & evaluation* (`13_quality.png`, `14_quality_compare.png`): headline results for the active rules on the held-out set, then *Results* (metrics with denominators, severity expected vs given, cases scored wrong), *Compare versions* (Rules v2.0 vs v2.1 with a plain verdict), *Run evaluation*, *Human overrides*, and *About & glossary*. Live-model evaluation is shown as **pending**.

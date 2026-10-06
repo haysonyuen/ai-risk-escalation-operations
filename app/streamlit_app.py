@@ -56,20 +56,22 @@ with st.sidebar:
     c = common.conn()
     mode = get_setting(c, "provider_mode")
     if mode != "offline":
-        st.warning("Assessment provider: " + ("live model" if mode == "live" else "FAULT INJECTION test"))
+        st.warning("Live model is on: assessments call the API." if mode == "live" else
+                   f"⚠️ Fault injection is on ({FAULT_MODES.get(mode.split(':', 1)[-1], mode).lower()}): AI output is "
+                   "deliberately broken. Turn it off in Demo settings.")
     with st.expander("Demo settings"):
         # Public demo: never offer live model calls, even if an API key is configured by mistake.
         modes = (["offline"] if common.public_demo() else ["offline", "live"]) + [f"fault:{m}" for m in FAULT_MODES]
-        labels = {"offline": "Offline (fixtures / simulation)",
+        labels = {"offline": "Demo AI (no live model)",
                   "live": "Live model" + ("" if config.live_credentials_available() else " — no API key set")}
-        labels.update({f"fault:{m}": f"Fault test: {d}" for m, d in FAULT_MODES.items()})
-        new = st.selectbox("AI assessment provider", modes, index=modes.index(mode) if mode in modes else 0, format_func=labels.get)
+        labels.update({f"fault:{m}": f"Fault injection: {d}" for m, d in FAULT_MODES.items()})
+        new = st.selectbox("AI used for assessments", modes, index=modes.index(mode) if mode in modes else 0, format_func=labels.get)
         if new != mode:
             wf.set_provider_mode(c, new, common.current_actor())
             st.rerun()
         if new == "live" and not config.live_credentials_available():
             st.caption("Without ANTHROPIC_API_KEY live assessments fail visibly and go to manual review — no silent fallback.")
-        st.caption(f"Active rules `{get_setting(c, 'active_rule_version')}` · prompt `{get_setting(c, 'active_prompt_version')}`")
+        st.caption(f"Active Rules {common.ver(get_setting(c, 'active_rule_version'))} · prompt {common.ver(get_setting(c, 'active_prompt_version'))}")
         if st.checkbox("Allow reset", key="confirm_reset"):
             if st.button("Reset demo data"):
                 from riskops.demo_db import seed_atomic
