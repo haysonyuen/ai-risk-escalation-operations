@@ -103,3 +103,11 @@ Operators could not tell which text on the case page was raw and which was gener
 * **Source data:** the report, intake fields and evidence exactly as received. Structured restricted-evidence and classifier fields (`key=value; …`) are displayed as readable fields; the stored data is unchanged and content is still never shown.
 * **AI analysis:** numbered sections: recommendation, summary, facts the AI found (each with its cited evidence inline and a supported/unsupported check), open questions (missing information, conflicting evidence, unverified possible explanations), suggested next steps, and a collapsed *How this was produced* (the former *AI details* tab).
 * The demo AI's summary no longer quotes rule IDs.
+
+## Fifth review: policy information
+
+Operators could not see which policy a case might violate. Policy is now shown wherever cases are:
+* **Policy library** (`config/policies.json`, *Rules & playbooks → Policies*): one synthetic policy per harm area, with a code (e.g. CS-01), a high-level definition, what usually points to it, owning team, severity guidance, escalation contacts (roles) and a review checklist. It maps one-to-one onto the taxonomy, so rules, scores and the evaluation are unchanged.
+* **Queue:** a Policy column (✓ confirmed, AI suggested, +N other policies), a Policy filter and policy-aware search.
+* **Case:** a policy chip in the header; *Likely policy* on the Summary card; **Policy and why** in AI analysis; a **Policy violated** field in the decision. Choosing a policy other than the suggestion is an audited override with a reason.
+* **Dashboard:** a policy filter on the status view, *Cases by policy* by severity, and *Policy changed by a person* under human oversight.

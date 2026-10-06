@@ -18,7 +18,7 @@ from .providers import FaultInjectionProvider, OfflineProvider
 from .schemas import IncidentIntake
 
 # Bump when seeded data or the schema changes incompatibly; older local databases are rebuilt.
-DEMO_DATA_VERSION = "demo-v2-taxonomy-v2"
+DEMO_DATA_VERSION = "demo-v3-policies"
 A = {a.actor_id: a for a in wf.SIMULATED_ACTORS}
 SYS = wf.SYSTEM_ACTOR
 S = "seed"
@@ -91,12 +91,13 @@ def seed(path: str | None = None, now: datetime | None = None) -> Path:
 
     # INC-1004: fixture under-calls an injection exfiltration as an agent mis-send (P2); C3 raised it
     # to P0 and C6 kept the rules' specialist route (Legal/Privacy). The analyst confirmed P0 and
-    # re-routed to Product Security (override: routing); the lead approved key rotation.
+    # re-routed to Product Security (override: routing) and the policy corrected to prompt injection; the lead approved key rotation.
     with at("INC-1004", 40):
         wf.decide_severity(conn, "INC-1004", A["alex.riskops"], "P0", "product_security",
                            ["Incident Lead", "Product Security", "Engineering", "Legal/Privacy"],
                            reason="E2 shows hidden instructions in the newsletter drove the send; injection-driven exfiltration is owned by Product Security, with Legal/Privacy involved.",
-                           override_reason_code="routing_ownership", evidence_reviewed=["E1", "E2", "E3"], origin=S)
+                           override_reason_code="routing_ownership", evidence_reviewed=["E1", "E2", "E3"], origin=S,
+                           policy="prompt_injection", other_policies=["enterprise_data_leakage", "model_security"])
         wf.transition(conn, "INC-1004", "INVESTIGATING", A["alex.riskops"], "Product Security engaged", origin=S)
         rot = wf.propose_containment(conn, "INC-1004", A["alex.riskops"], "rotate_credentials", "the two exposed production API keys",
                                      "Keys were used from an unknown IP; they must be rotated.", origin=S)
@@ -143,7 +144,8 @@ def seed(path: str | None = None, now: datetime | None = None) -> Path:
     with at("INC-1011", 2000):
         wf.decide_severity(conn, "INC-1011", A["alex.riskops"], "P2", "model_behavior", ["Model Behavior", "Engineering", "Support"],
                            reason="Audit E1 confirms a dosage unit-conversion regression affecting several users; rules missed the medical context.",
-                           override_reason_code="under_escalation", evidence_reviewed=["E1", "E2"], origin=S)
+                           override_reason_code="under_escalation", evidence_reviewed=["E1", "E2"], origin=S,
+                           policy="harmful_inaccuracy")
         wf.transition(conn, "INC-1011", "INVESTIGATING", A["alex.riskops"], origin=S)
 
     # INC-1012: P2 bias finding, closed and QA-reviewed.

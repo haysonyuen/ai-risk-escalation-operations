@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import config
 from .db import rows
-from .workflow import effective_severity, get_assessment, latest_communications, next_actions
+from .workflow import effective_policy, effective_severity, get_assessment, latest_communications, next_actions
 
 OPEN = {"NEW", "ASSESSED", "ASSESSMENT_FAILED", "TRIAGED", "INVESTIGATING", "CONTAINMENT", "RESPONSE", "REOPENED"}
 
@@ -63,10 +63,12 @@ def queue(conn, now: datetime | None = None) -> list[dict]:
         if a and a["output"]:
             categories = list(a["output"]["risk_categories"]) + [c for c in categories if c not in a["output"]["risk_categories"]]
         categories = [c for c in categories if c != "benign_noise"] or categories
+        pol, pol_basis, pol_other = effective_policy(conn, inc)
         out.append({
             "incident_id": inc["incident_id"], "title": inc["title"], "status": inc["status"], "owner": inc["owner"] or "",
             "product_surface": intake.get("product_surface"), "customer_type": intake.get("customer_type"),
             "categories": categories,
+            "policy": pol, "policy_basis": pol_basis, "other_policies": pol_other,
             "ai_severity": a["controlled_severity"] if a else None,
             "ai_model_severity": a["model_severity"] if a else None,
             "ai_source": a["provider_kind"] if a else "none",
@@ -154,7 +156,16 @@ def ops_metrics(conn, now: datetime | None = None) -> dict:
     for d in overrides:
         ai = json.loads(d["details_json"])["ai_recommendation"]["severity"]
         hu = json.loads(d["new_value"])["severity"]
-        directions["raised" if hu < ai else "lowered" if hu > ai else "route_only"] += 1
+        if hu != ai:
+            directions["raised" if hu < ai else "lowered"] += 1
+        else:
+            nv, ai_rec = json.loads(d["new_value"]), json.loads(d["details_json"])["ai_recommendation"]
+            directions["route_only" if nv.get("route") != ai_rec.get("route") else "policy_only"] += 1
+    policy_changed = 0
+    for d in with_ai:
+        ai_pol = json.loads(d["details_json"])["ai_recommendation"].get("policy")
+        if ai_pol and json.loads(d["new_value"]).get("policy", ai_pol) != ai_pol:
+            policy_changed += 1
 
     cat_counts = Counter()
     for x in q:
@@ -178,8 +189,10 @@ def ops_metrics(conn, now: datetime | None = None) -> dict:
         "auto_hold": auto_hold,
         "overrides": {"decisions_with_ai_recommendation": len(with_ai), "overrides": len(overrides),
                       "override_rate": (len(overrides) / len(with_ai)) if with_ai else None,
-                      "by_reason": dict(reasons), "by_direction": dict(directions)},
+                      "by_reason": dict(reasons), "by_direction": dict(directions),
+                      "policy_changed": policy_changed},
         "category_counts": dict(cat_counts),
+        "policy_counts": dict(Counter(x["policy"] for x in q if x["policy"])),
         "confirmed_links": {r["link_type"]: r["n"] for r in linked},
         "assessment_failures": failures,
         "assessments_by_version": by_version,

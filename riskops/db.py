@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS incidents (
     human_severity TEXT,
     human_route TEXT,
     human_teams_json TEXT,
+    human_policy TEXT,                 -- primary policy confirmed by a person (config/policies.json key)
+    human_policies_json TEXT,          -- other policies confirmed by a person
     severity_decided_by TEXT,
     severity_decided_at TEXT,
     first_human_review_at TEXT,
@@ -207,6 +209,10 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    have = {r[1] for r in conn.execute("PRAGMA table_info(incidents)")}
+    for col in ("human_policy", "human_policies_json"):  # databases created before policies existed
+        if col not in have:
+            conn.execute(f"ALTER TABLE incidents ADD COLUMN {col} TEXT")
     for k, v in DEFAULT_SETTINGS.items():
         conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))
     conn.commit()

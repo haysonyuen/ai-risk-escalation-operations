@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from riskops import config  # noqa: E402
+from riskops import policies  # noqa: E402
 from riskops import workflow as wf  # noqa: E402
 from riskops.db import connect, get_setting  # noqa: E402
 from riskops.providers import get_provider  # noqa: E402
@@ -111,6 +112,8 @@ def control_name(cid: str) -> str:
 GLOSSARY = {
     "Escalation and response": [
         ("P0–P3", "Severity. P0 critical, P1 high, P2 medium, P3 low."),
+        ("Policy", "Which policy the case may violate, with a short code (e.g. Child safety, CS-01). Suggested by the AI and rules, "
+                   "confirmed by a person in the severity decision. See Rules & playbooks → Policies."),
         ("Triage", "A person sets severity and the owning team (route). Until then the case is *Awaiting triage*."),
         ("Containment", "Steps that limit ongoing harm, e.g. pausing a session or rotating credentials. All simulated here."),
         ("Response", "Communication with the affected user or customer. Drafts only; nothing is sent."),
@@ -146,6 +149,22 @@ def ver(v: str | None) -> str:
     return v.split("-", 1)[1].replace("-", " ") if "-" in v else v
 
 
+POLICY_BASIS = {"human": "✓ confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "rules-suggested · AI failed",
+                "unassessed_default": "not assessed"}
+
+
+def policy_label(key: str | None, code: bool = True) -> str:
+    return policies.label(key, code) if key else "Not assessed"
+
+
+def policy_badge(key: str | None, basis: str, prefix: str = "Policy: ") -> str:
+    p = policies.get(key)
+    title = esc(p["definition"]) if p else ""
+    cls = "b-human" if basis == "human" else "b-fixture"
+    return (f'<span class="badge {cls}" title="{title}">{esc(prefix + policy_label(key))}'
+            f'{" · " + esc(POLICY_BASIS.get(basis, basis)) if key else ""}</span>')
+
+
 def phase_badge(status: str) -> str:
     p = phase(status)
     return f'<span class="badge {PHASE_BADGE[p]}" title="{esc(PHASE_HELP[p])}">{esc(p)}</span>'
@@ -162,7 +181,8 @@ SPLIT_HELP = {"dev": "used for tuning", "held_out": "frozen, never used for tuni
 GATE_LABEL = {"P0/P1 recall (after controls)": "P0/P1 recall", "Mandatory review compliance": "Mandatory review flagged when needed",
               "Severity within acceptable range": "Severity within range", "Primary route acceptable": "Route acceptable",
               "Schema-valid rate": "Valid AI output", "C7 auto-pause recall": "Auto-pause (C7) recall"}
-OVERRIDE_DIRECTION = {"raised": "Raised severity", "lowered": "Lowered severity", "route_only": "Route only (owning team changed)"}
+OVERRIDE_DIRECTION = {"raised": "Raised severity", "lowered": "Lowered severity", "route_only": "Route only (owning team changed)",
+                      "policy_only": "Policy only (policy changed)"}
 TEAMS = SCHEMA_TEAMS
 EVIDENCE_TYPES = ["reporter_statement", "conversation_excerpt", "tool_action_log", "file_diff", "approval_event",
                   "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note",
