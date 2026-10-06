@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import streamlit as st
 
-from common import (OVERRIDE_DIRECTION, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE,
+from common import (alerts, policy_with_more, OVERRIDE_DIRECTION, POLICY_STATUS_WORD, SEVERITY_BASIS_WORD, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE,
                     actor_name, conn, go, go_case, phase, policy_label, pretty, stage, ver, GATE_LABEL, SOURCE_LABEL, SPLIT_NAME)
 from riskops import config, monitoring, policies, workflow as wf
 from riskops.db import get_setting, rows
@@ -57,11 +57,11 @@ def _status_section() -> None:
         st.altair_chart(_bar(by_stage, "Stage", [s for s in STAGES if s in set(df["Stage"])], 240), use_container_width=True)
 
     table = pd.DataFrame([{
-        "ID": x["incident_id"], "Severity": x["effective_severity"] + (" ✓" if x["severity_basis"] == "human" else " · AI"),
-        "Status": phase(x["status"]) + (" ⏸️" if x["auto_paused"] else ""), "Stage": STATUS_LABEL[x["status"]],
+        "ID": x["incident_id"], "Severity": f"{x['effective_severity']} · {SEVERITY_BASIS_WORD[x['severity_basis']]}",
+        "Status": phase(x["status"]), "Alerts": " · ".join(alerts(x)), "Stage": STATUS_LABEL[x["status"]],
         "Title": x["title"],
-        "Code": (policies.code(x["policy"]) + (" ✓" if x["policy_basis"] == "human" else "")) if x["policy"] else "—",
-        "Policy": policy_label(x["policy"], code=False),
+        "Code": policies.code(x["policy"]) if x["policy"] else "—",
+        "Policy": policy_with_more(x), "Policy status": POLICY_STATUS_WORD[x["policy_basis"]],
         "Age (h)": x["age_hours"], "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
         "Next action": x["next_actions"][0]["title"] if x["next_actions"] else "—"} for x in sorted(
             items, key=lambda x: (STATUS_PHASE[x["status"]], STATUS_STAGE[x["status"]], {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[x["effective_severity"]]))])
@@ -69,9 +69,9 @@ def _status_section() -> None:
     ev = st.dataframe(table, hide_index=True, use_container_width=True, on_select="rerun", selection_mode="single-row",
                       key=f"d_table_{st.session_state.get('d_nonce', 0)}", height=min(36 * (len(table) + 1) + 4, 420),
                       column_config={"Age (h)": st.column_config.NumberColumn(format="%.1f", width=70),
-                                     "ID": st.column_config.TextColumn(width=78), "Severity": st.column_config.TextColumn(width=70),
+                                     "ID": st.column_config.TextColumn(width=78), "Severity": st.column_config.TextColumn(width=140),
                                      "Title": st.column_config.TextColumn(width=220),
-                                     "Code": st.column_config.TextColumn(width=80, help="Policy code. ✓ confirmed by a person"),
+                                     "Code": st.column_config.TextColumn(width=62, help="Policy code, e.g. CS-01"),
                                      "Policy": st.column_config.TextColumn(width=190)})
     sel = ev.selection.rows if ev and hasattr(ev, "selection") else []
     if sel:

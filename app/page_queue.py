@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from common import (drop_stale, policy_label, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE, actor_name, conn,
+from common import (alerts, drop_stale, policy_label, policy_with_more, POLICY_STATUS_WORD, SEVERITY_BASIS_WORD, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE, actor_name, conn,
                     current_actor, go, go_case, phase, relative, stage)
 from riskops import monitoring, policies, workflow as wf
 
@@ -97,52 +97,34 @@ def render() -> None:
     sort_by = srt.selectbox("Sort", list(SORTS), key="q_sort", label_visibility="collapsed", format_func=lambda k: f"Sort: {k}")
     shown = sorted(shown, key=SORTS[sort_by])
     rows = []
-    basis_short = {"human": "✓", "ai_after_controls": "· AI", "rules_after_ai_failure": "· rules", "unassessed_default": "· default"}
     for x in shown:
         nxt = x["next_actions"][0] if x["next_actions"] else None
         is_open = x["status"] in monitoring.OPEN
         due = ""
         if is_open and not x["human_severity"]:
-            due = ("⚠ " if x["overdue"] else "") + relative(x["minutes_to_deadline"])
-        status = phase(x["status"]) + (" ⏸️" if x["auto_paused"] else "") + (" ⚠️" if x["overdue"] and is_open else "")
-        flags = []  # joined with spaces below
-        if x["mandatory_review"] and is_open and not x["human_severity"]:
-            flags.append("⚑")
-        if x["ai_source"] == "fault_injection":
-            flags.append("🧪")
+            due = relative(x["minutes_to_deadline"]).capitalize()
         rows.append({
-            "Severity": f"{x['effective_severity']} {basis_short[x['severity_basis']]}",
+            "Severity": f"{x['effective_severity']} · {SEVERITY_BASIS_WORD[x['severity_basis']]}",
             "ID": x["incident_id"],
             "Title": x["title"],
-            "Code": (policies.code(x["policy"]) + (" ✓" if x["policy_basis"] == "human" else " · AI" if x["policy"] else "")
-                     + (f" +{len(x['other_policies'])}" if x["other_policies"] else "")) if x["policy"] else "—",
-            "Policy": policy_label(x["policy"], code=False),
-            "Status": status,
+            "Code": policies.code(x["policy"]) if x["policy"] else "—",
+            "Policy": policy_with_more(x),
+            "Policy status": POLICY_STATUS_WORD[x["policy_basis"]],
+            "Status": phase(x["status"]),
+            "Alerts": " · ".join(alerts(x)),
             "Stage": STATUS_LABEL[x["status"]],
-            "Flags": " ".join(flags),
-            "Next action": (("" if wf.actor_can_do(c, me, nxt) else "🔒 ") + nxt["title"]) if nxt else "—",
+            "Next action": (nxt["title"] + ("" if wf.actor_can_do(c, me, nxt) else f" (needs {wf.who_can_do(nxt)})")) if nxt else "—",
             "First review": due,
             "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
         })
     cap.caption(f"{len(rows)} case(s) · sorted by {sort_by[0].lower() + sort_by[1:]} · click a row to open it")
     with leg.popover("How to read this", use_container_width=True):
         st.markdown("""
-**Severity**: P0 critical · P1 high · P2 medium · P3 low
-- `P0 ✓` a person confirmed it
-- `P0 · AI` AI-suggested (after safety controls), not yet confirmed
-- `P0 · rules` the AI failed, so the deterministic rules' view is shown
-- `P1 · default` not assessed yet
-
-**Status**: Awaiting triage → In progress → Closed. ⏸️ auto-paused (C7), waiting for a specialist · ⚠️ SLA overdue
-
-**Stage**: the detail within the status, e.g. *Containment* or *Closed · QA pending*. Filter by stage under **Filters → More filters**.
-
-**Flags**: ⚑ mandatory review pending · 🧪 fault-injection test data
-
-**Code / Policy**: the policy the case may violate, e.g. `CS-01` *Child safety*. `✓` a person confirmed it · `AI` suggested, not confirmed · `+1` more policies on the case. Hover a policy on the case page for its definition.
-
-**Next action**: 🔒 means your current role can't do it. Switch roles with *Working as* in the sidebar.
-
+- **Severity**: P0 critical · P1 high · P2 medium · P3 low. *Confirmed* means a person decided; *AI-suggested* means not yet confirmed.
+- **Code / Policy**: the policy the case may violate. *+N more* means other policies also match. **Policy status** says whether a person confirmed it.
+- **Status**: Awaiting triage → In progress → Closed. **Stage** is the detail.
+- **Alerts**: *Paused (C7)* session paused automatically, a specialist must confirm or lift · *SLA overdue* first review is late · *Review required* a person must review before any decision · *Test data* fault-injection test.
+- **Next action**: *(needs …)* means another role must do it. Switch roles with *Working as* in the sidebar.
 """)
     if not rows:
         st.info("Nothing here. Try another view or clear the filters.")
@@ -153,17 +135,18 @@ def render() -> None:
         styled, hide_index=True, use_container_width=True, on_select="rerun", selection_mode="single-row",
         key=f"q_table_{view}_{st.session_state.get('q_nonce', 0)}", height=min(36 * (len(rows) + 1) + 4, 640),
         column_config={
-            "Severity": st.column_config.TextColumn(width=86, help="✓ = human-confirmed. AI = recommendation after safety controls, not yet confirmed."),
-            "ID": st.column_config.TextColumn(width=72),
+            "Severity": st.column_config.TextColumn(width=150, help="P0 critical · P1 high · P2 medium · P3 low. Confirmed = decided by a person; AI-suggested = after safety controls, not yet confirmed."),
+            "ID": st.column_config.TextColumn(width=78),
             "Title": st.column_config.TextColumn(width=210),
-            "Code": st.column_config.TextColumn(width=104, help="Policy code. ✓ confirmed by a person · AI suggested, not confirmed · +N other policies on the case"),
-            "Policy": st.column_config.TextColumn(width=200, help="Name of the policy the case may violate"),
-            "Status": st.column_config.TextColumn(width=128, help="Awaiting triage · In progress · Closed. ⏸️ auto-paused (C7) · ⚠️ SLA overdue"),
-            "Stage": st.column_config.TextColumn(width=215, help="Detail within the status: Intake, AI assessment, Triage, Investigation, Containment, Response, Closure, QA review"),
-            "Next action": st.column_config.TextColumn(width=186),
-            "First review": st.column_config.TextColumn(width=92, help="SLA: time to the first human review target (prototype assumptions)"),
-            "Owner": st.column_config.TextColumn(width=52),
-            "Flags": st.column_config.TextColumn(width=52, help="⚑ mandatory review pending · 🧪 fault-injection test data"),
+            "Code": st.column_config.TextColumn(width=62, help="Policy code, e.g. CS-01. See Rules & playbooks → Policies."),
+            "Policy": st.column_config.TextColumn(width=200, help="Policy the case may violate. '+N more' = other policies also match this case."),
+            "Policy status": st.column_config.TextColumn(width=104, help="Confirmed = a person confirmed the policy; AI-suggested = not yet confirmed."),
+            "Status": st.column_config.TextColumn(width=118, help="Awaiting triage · In progress · Closed"),
+            "Alerts": st.column_config.TextColumn(width=210, help="Paused (C7): session paused automatically, a specialist must confirm or lift · SLA overdue: first review is late · Review required: a person must review before any decision · Test data: fault-injection test"),
+            "Stage": st.column_config.TextColumn(width=200, help="Detail within the status: Intake, AI assessment, Triage, Investigation, Containment, Response, Closure, QA review"),
+            "Next action": st.column_config.TextColumn(width=280, help="What the case needs next. '(needs …)' = a different role must do it."),
+            "First review": st.column_config.TextColumn(width=120, help="SLA: time to the first human review target (prototype assumptions)"),
+            "Owner": st.column_config.TextColumn(width=60),
         })
     sel = event.selection.rows if event and hasattr(event, "selection") else []
     if sel:

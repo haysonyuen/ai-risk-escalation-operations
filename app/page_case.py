@@ -689,14 +689,26 @@ def render() -> None:
     pol, pol_basis, _ = wf.effective_policy(c, inc)
     chips = [phase_badge(inc["status"]), policy_badge(pol, pol_basis), badge("Owner: " + (actor_name(inc["owner"]) if inc["owner"] else "unassigned")),
              source_badge(a["provider_kind"] if a else "none")]
+    if row["auto_paused"]:
+        chips.append(badge("Paused (C7)", "b-p0",
+                           "The reported conversation was paused automatically because the case is rated P0 in CBRN or child safety. "
+                           "A Safety specialist or the Incident Lead must confirm or lift it under Containment; it never lifts itself."
+                           + (" The review is overdue and has been escalated to the Incident Lead." if row["auto_pause_overdue"] else "")))
     if row["overdue"]:
-        chips.append(badge("⚠️ SLA: first review " + relative(row["minutes_to_deadline"]), "b-p0"))
+        chips.append(badge("SLA overdue: first review " + relative(row["minutes_to_deadline"]), "b-p0",
+                           "No person has made a severity decision within the first-review target for this severity "
+                           "(prototype SLA assumptions). Decide severity and routing to clear it."))
     elif row["minutes_to_deadline"] is not None and not inc["human_severity"]:
-        chips.append(badge("SLA: first review " + relative(row["minutes_to_deadline"]), "b-warn"))
+        chips.append(badge("SLA: first review " + relative(row["minutes_to_deadline"]), "b-warn",
+                           "Time left to make the first human severity decision (prototype SLA assumptions)."))
     if row["mandatory_review"] and inc["status"] not in CLOSED and not inc["human_severity"]:
-        chips.append(badge("⚑ Mandatory human review", "b-warn"))
+        chips.append(badge("Review required", "b-warn",
+                           "A person must review the source evidence before any decision; the AI cannot clear this case. "
+                           "See 'Why a person must review this' under AI analysis."))
+    if row["ai_source"] == "fault_injection":
+        chips.append(badge("Test data", "b-fault", "The AI assessment came from a fault-injection test: the AI was deliberately broken to check the safety controls."))
     if inc["origin"] == "seed":
-        chips.append(badge("Synthetic demo data"))
+        chips.append(badge("Synthetic demo data", "b-muted", "A made-up case seeded for the demo. No real people or systems are involved."))
     md(" ".join(chips))
     md(stepper(inc["status"]))
 
