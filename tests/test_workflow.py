@@ -282,7 +282,7 @@ def test_next_actions_guide_by_status_and_role(conn, actors):
     wf.transition(conn, iid, "RESPONSE", actors["sam.lead"])
     close = [x for x in wf.next_actions(conn, iid) if x["title"].startswith("Close")][0]
     assert close["permission"] == "close_p0p1"
-    assert wf.closure_blockers(conn, iid) == ["An automatic pause (C7) has not been confirmed or lifted"]
+    assert wf.closure_blockers(conn, iid) == ["The automatic session pause has not been confirmed or lifted"]
     hold = wf.pending_auto_holds(conn, iid)[0]["action_id"]
     wf.review_auto_hold(conn, hold, actors["priya.safety"], True, "Specialist confirmed")
     assert wf.closure_blockers(conn, iid) == []  # active containment is acknowledged in the dialog, not a blocker

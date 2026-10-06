@@ -126,7 +126,7 @@ def _headline(runs: list[dict]) -> None:
     k3.metric("Route acceptable", fmt(m["routing"]["primary_route_acceptable"]).split(" (")[0],
               help="Case sent to a team the label accepts as owner.")
     c7 = m.get("auto_hold_c7", {}).get("recall")
-    k4.metric("Auto-pause (C7) correct", fmt(c7).split(" (")[0] if c7 else "n/a",
+    k4.metric("Valid auto pause", fmt(c7).split(" (")[0] if c7 else "n/a",
               help="P0 CBRN / child-safety cases that were paused automatically, out of those that should be.")
 
 
@@ -163,8 +163,8 @@ def _results(runs: list[dict]) -> None:
         ("Mandatory review: flagged when needed", "Cases needing review that were flagged", None, m["mandatory_review"]["compliance_flagged_when_required"]),
         ("Mandatory review: flagged when not needed", "Lower is better (over-flagging)", None, m["mandatory_review"]["flagged_when_not_required"]),
         ("Harm category recall", "Cases where every labelled harm category was tagged", None, m.get("category_recall")),
-        ("Auto-pause (C7) recall", "Paused when it should have been", None, c7["recall"] if c7 else None),
-        ("Auto-pause (C7) precision", "Pauses that were warranted", None, c7["precision"] if c7 else None),
+        ("Auto-pause recall", "Paused when it should have been", None, c7["recall"] if c7 else None),
+        ("Auto-pause precision", "Pauses that were warranted", None, c7["precision"] if c7 else None),
     ]
     st.dataframe(pd.DataFrame([{"Metric": n, "What it measures": d, "AI recommendation": fmt(x) if x else "",
                                 "After safety controls": fmt(y)} for n, d, x, y in tbl]),
@@ -267,8 +267,8 @@ def _compare(runs: list[dict]) -> None:
         ("Severity exact match", lambda m: m["after_deterministic_controls"]["exact_match"]["value"]),
         ("Route acceptable", lambda m: m["routing"]["primary_route_acceptable"]["value"]),
         ("Mandatory review flagged when needed", lambda m: m["mandatory_review"]["compliance_flagged_when_required"]["value"]),
-        ("Auto-pause (C7) recall", lambda m: m["auto_hold_c7"]["recall"]["value"]),
-        ("Auto-pause (C7) precision", lambda m: m["auto_hold_c7"]["precision"]["value"]),
+        ("Auto-pause recall", lambda m: m["auto_hold_c7"]["recall"]["value"]),
+        ("Auto-pause precision", lambda m: m["auto_hold_c7"]["precision"]["value"]),
         ("Valid AI output", lambda m: m["schema_valid_rate"]["value"]),
     ]
     tbl = []

@@ -111,3 +111,13 @@ Operators could not see which policy a case might violate. Policy is now shown w
 * **Queue:** separate Code and Policy columns (✓ confirmed, AI suggested, +N other policies on the code), everywhere else a code-first label such as *CS-01 · Child safety*, a Policy filter and policy-aware search.
 * **Case:** a policy chip in the header; *Likely policy* on the Summary card; **Policy and why** in AI analysis; a **Policy violated** field in the decision. Choosing a policy other than the suggestion is an audited override with a reason.
 * **Dashboard:** a policy filter on the status view, *Cases by policy* by severity, and *Policy changed by a person* under human oversight.
+
+## Sixth review: words instead of symbols
+
+Symbols such as ⏸️ ⚠️ ⚑ 🧪 ✓ and "+2" needed decoding, and Streamlit's interactive table cannot show a pop-up per cell. They were replaced by words:
+* **Severity:** *P0 · Confirmed*, *AI-suggested*, *Needs manual triage* (the AI failed; the rules' estimate is a placeholder) or *Not assessed*.
+* **Alerts column:** *Session auto-paused*, *SLA overdue*, *Review required*, *AI failed*, *Test data*.
+* **Policy:** separate *Code*, *Policy* (with "+N more") and *Policy status* columns.
+* **Next action:** "(needs Incident Lead)" instead of a lock symbol.
+* **Case header chips** show an instant hover pop-up explaining each one.
+* **Control codes** such as C7 are no longer shown in operator views ("Session auto-paused", "raised to the rules' minimum severity"); they stay in technical views (AI analysis → How this was produced, Rules & playbooks, glossary, audit log). The Quality headline card reads *Valid auto pause*.

@@ -120,9 +120,9 @@ def _steps(ui: UI) -> None:
     ui.p.goto(URL + "/case?id=INC-1002")
     ui.idle()
     ui.actor("Priya")
-    ui.expect("Auto-paused (C7)")
+    ui.expect("Session auto-paused · waiting for specialist review")
     assert not ui.is_disabled("Confirm pause"), "A Safety specialist must be able to confirm the automatic pause"
-    ui.p.get_by_text("Auto-paused (C7)").first.scroll_into_view_if_needed()
+    ui.p.get_by_text("Session auto-paused · waiting for specialist review").first.scroll_into_view_if_needed()
     ui.shot("auto_pause_awaiting_review")
     ui.fill_ph("Reason (lifting needs 20+ characters)", "Specialist verdict E1 confirmed; keep the session paused while Child Safety reviews.")
     ui.button("Confirm pause")

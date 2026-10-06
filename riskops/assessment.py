@@ -153,7 +153,10 @@ def assess_incident(incident: IncidentIntake, provider: AssessmentProvider, rule
         trigger = trigger or ["combined"]  # e.g. rules say P0 for another reason, provider adds the category
         label = " / ".join(c.replace("cbrn", "CBRN").replace("child_safety", "child safety") for c in hold_cats)
         auto_hold = {"target": "the reported conversation/session", "categories": hold_cats, "trigger": trigger,
-                     "reason": f"P0 {label} recommendation ({' + '.join(trigger)}): session paused pending human review"}
+                     "reason": f"P0 {label} rating from "
+                               + " and ".join("the rules" if t == "rules" else "the AI and rules together" if t == "combined" else "the AI"
+                                              for t in trigger)
+                               + ": session paused until a person reviews it"}
         reasons.append(_reason("C7", f"Automatic pause applied (P0 {label}); a person must confirm or lift it"))
         controls.append({"id": "C7", "effect": "auto_hold", "detail": auto_hold["reason"]})
 
