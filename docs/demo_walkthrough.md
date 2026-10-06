@@ -42,7 +42,7 @@ Read the *Summary* cards (📄 what was reported, ✨ what the AI concluded), th
 * Each extracted fact appears **next to the evidence text it cites**. Fact 3 cites **E5, which does not exist in this case**, and is marked in red. One click records whether each fact is supported.
 
 ### 3. Human correction with a recorded reason (40 s): `05_decision_recorded.png`
-As *Alex (Risk Ops)*, in the **Severity & routing decision** card:
+As *Alex (Risk Ops)*, in the **Severity, policy & routing decision** card (the policy, *Enterprise data leakage (DL-01)*, is pre-filled from the AI suggestion):
 1. Choose **P0**.
 2. Select evidence E2, E3 and E4.
 

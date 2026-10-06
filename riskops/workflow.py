@@ -18,7 +18,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from . import config
+from . import config, policies
 from .assessment import assess_incident, is_downgrade
 from .db import get_setting, log_event, now_iso, row, rows, set_setting, utcnow
 from .rules import available_versions
@@ -197,6 +197,17 @@ def effective_severity(conn, inc: dict) -> tuple[str, str]:
     return "P1", "unassessed_default"
 
 
+def effective_policy(conn, inc: dict) -> tuple[str | None, str, list[str]]:
+    """(primary policy, basis, other policies). A person's decision wins; otherwise the AI/rules suggestion."""
+    if inc["human_policy"]:
+        return inc["human_policy"], "human", json.loads(inc["human_policies_json"] or "[]")
+    a = get_assessment(conn, inc["current_assessment_id"])
+    s = policies.suggested(a)
+    if not s:
+        return None, "unassessed_default", []
+    return s[0], "ai_after_controls" if a["status"] == "valid" else "rules_after_ai_failure", s[1:]
+
+
 def timeline(conn, incident_id: str) -> list[dict]:
     return rows(conn, "SELECT * FROM events WHERE incident_id=? ORDER BY ts, event_id", (incident_id,))
 
@@ -362,7 +373,10 @@ OVERRIDE_REASONS = {
 
 def decide_severity(conn, incident_id: str, actor: Actor, severity: str, route: str, teams: list[str],
                     reason: str = "", override_reason_code: str | None = None,
-                    evidence_reviewed: list[str] | None = None, origin: str = "demo", ts: str | None = None) -> dict:
+                    evidence_reviewed: list[str] | None = None, origin: str = "demo", ts: str | None = None,
+                    policy: str | None = None, other_policies: list[str] | None = None) -> dict:
+    """Record the human severity, route and policy decision. ``policy`` defaults to the AI-suggested
+    primary policy; choosing a different one is an override and needs a reason like any other."""
     require(actor, "decide_severity")
     if severity not in SEVERITIES:
         raise WorkflowError("Invalid severity")
@@ -372,7 +386,17 @@ def decide_severity(conn, incident_id: str, actor: Actor, severity: str, route: 
     a = get_assessment(conn, inc["current_assessment_id"])
     ai_sev = a["controlled_severity"] if a else None
     ai_route = a["controlled_route"] if a else None
-    is_override = bool(a) and (severity != ai_sev or route != ai_route)
+    ai_policies = policies.suggested(a)
+    ai_policy = ai_policies[0] if ai_policies else None
+    policy = policy or inc["human_policy"] or ai_policy
+    if policy is not None and policies.get(policy) is None:
+        raise WorkflowError("Unknown policy")
+    if other_policies is None:
+        other_policies = [p for p in ai_policies if p != policy]
+    other_policies = [p for p in dict.fromkeys(other_policies) if p not in (policy, "benign_noise")]
+    if any(policies.get(p) is None for p in other_policies):
+        raise WorkflowError("Unknown policy")
+    is_override = bool(a) and (severity != ai_sev or route != ai_route or (ai_policy is not None and policy != ai_policy))
     evidence_reviewed = evidence_reviewed or []
     valid_ids = {e["evidence_id"] for e in rows(conn, "SELECT evidence_id FROM evidence WHERE incident_id=?", (incident_id,))}
     bad = [e for e in evidence_reviewed if e not in valid_ids]
@@ -392,15 +416,18 @@ def decide_severity(conn, incident_id: str, actor: Actor, severity: str, route: 
         raise WorkflowError("Changing an existing human severity decision requires a rationale")
 
     ts = ts or now_iso()
-    prev = {"severity": inc["human_severity"], "route": inc["human_route"], "teams": json.loads(inc["human_teams_json"] or "null")}
-    conn.execute("UPDATE incidents SET human_severity=?, human_route=?, human_teams_json=?, severity_decided_by=?,"
-                 " severity_decided_at=?, first_human_review_at=COALESCE(first_human_review_at, ?) WHERE incident_id=?",
-                 (severity, route, json.dumps(teams), actor.actor_id, ts, ts, incident_id))
+    prev = {"severity": inc["human_severity"], "route": inc["human_route"], "teams": json.loads(inc["human_teams_json"] or "null"),
+            "policy": inc["human_policy"], "other_policies": json.loads(inc["human_policies_json"] or "null")}
+    conn.execute("UPDATE incidents SET human_severity=?, human_route=?, human_teams_json=?, human_policy=?, human_policies_json=?,"
+                 " severity_decided_by=?, severity_decided_at=?, first_human_review_at=COALESCE(first_human_review_at, ?)"
+                 " WHERE incident_id=?",
+                 (severity, route, json.dumps(teams), policy, json.dumps(other_policies), actor.actor_id, ts, ts, incident_id))
     log_event(conn, incident_id=incident_id, actor_id=actor.actor_id, actor_role=actor.role,
               event_type="human_override" if is_override else "human_severity_confirmed", field="severity/route",
-              previous=prev, new={"severity": severity, "route": route, "teams": teams},
+              previous=prev, new={"severity": severity, "route": route, "teams": teams, "policy": policy, "other_policies": other_policies},
               reason=reason.strip() or None, origin=origin, ts=ts,
-              details={"ai_recommendation": {"severity": ai_sev, "route": ai_route, "assessment_id": a["assessment_id"] if a else None},
+              details={"ai_recommendation": {"severity": ai_sev, "route": ai_route, "policy": ai_policy,
+                                             "assessment_id": a["assessment_id"] if a else None},
                        "override_reason_code": override_reason_code if is_override else None,
                        "evidence_reviewed": evidence_reviewed})
     if inc["status"] in ("NEW", "ASSESSED", "ASSESSMENT_FAILED", "REOPENED"):

@@ -8,11 +8,11 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import streamlit as st
 
-from common import (action_label, control_name, readable_fields, ver, humanize, phase_badge, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
+from common import (action_label, control_name, policy_badge, policy_label, readable_fields, ver, humanize, phase_badge, BASIS_LABEL, CATEGORY_LABEL, CONTROL_TEXT, EVIDENCE_TYPES, FIELD_LABEL, ROUTE_LABEL, STATUS_LABEL,
                     TEAMS, actor_name, ago, badge, conn, current_actor, describe_event, esc, feedback, go, md,
                     permission_hint, pretty, provider_for_mode, relative, run_action, run_inline, section, sev_badge,
                     source_badge, stepper)
-from riskops import communications, dedup, monitoring, workflow as wf
+from riskops import communications, dedup, monitoring, policies, workflow as wf
 from riskops.db import rows
 from riskops.schemas import CONTAINMENT_TYPES, ROUTES, SEVERITIES, Evidence
 
@@ -78,7 +78,9 @@ def close_dialog(iid: str) -> None:
     inc = wf.get_incident(c, iid)
     intake = wf.get_intake(c, iid)
     active = rows(c, "SELECT * FROM containment_actions WHERE incident_id=? AND status='active'", (iid,))
-    md(f"Final severity {sev_badge(inc['human_severity'], 'from the human decision')} · signing as <b>{esc(current_actor().display)}</b>")
+    md(f"Final severity {sev_badge(inc['human_severity'], 'from the human decision')}"
+       + (f" · policy <b>{esc(policy_label(inc['human_policy']))}</b>" if inc["human_policy"] else "")
+       + f" · signing as <b>{esc(current_actor().display)}</b>")
     with st.form("closure"):
         cat = st.selectbox("Closure category", wf.CLOSURE_CATEGORIES, format_func=pretty)
         rc = st.text_input("Root cause")
@@ -172,13 +174,43 @@ def _summary(inc, intake, a) -> None:
     else:
         o = a["output"]
         n_open = len(o["missing_information"]) + len(o["contradictions"])
+        sug = policies.suggested(a)
         body = (f'<div><b>Recommendation:</b> {sev_badge(a["controlled_severity"])} → <b>{esc(ROUTE_LABEL[a["controlled_route"]])}</b> '
                 f'<span class="small">(after safety controls)</span></div>'
-                f'<div class="small">{esc(_change_line(a, ctl))}</div>'
-                f'<div style="margin-top:6px"><b>In short:</b> {esc(o["summary"])}</div>'
+                + f'<div class="small">{esc(_change_line(a, ctl))}</div>'
+                + (f'<div style="margin-top:6px"><b>Likely policy:</b> {esc(policy_label(sug[0]))}'
+                   + (f'<span class="small">, also {esc(", ".join(policy_label(x) for x in sug[1:]))}</span>' if sug[1:] else "") + "</div>"
+                   if sug else "")
+                + f'<div style="margin-top:6px"><b>In short:</b> {esc(o["summary"])}</div>'
                 + need + f'<div class="small" style="margin-top:6px">{n_open} open question(s) · facts and evidence checks under <b>AI analysis</b></div>')
         need = ""
     md(f'<div class="card ai">{AI_LABEL}<div class="card-h">What the AI concluded</div>{body}{need}</div>')
+
+
+def _policy_section(inc, a) -> None:
+    st.markdown("#### 2. Policy and why")
+    sug = policies.suggested(a)
+    if not sug:
+        st.caption("No policy suggested.")
+        return
+    key = sug[0]
+    p = policies.get(key)
+    md(f"<b>{esc(policy_label(key))}</b> <span class='small'>· suggested by the AI and rules</span>")
+    if inc["human_policy"] and inc["human_policy"] != key:
+        md(f"<span class='small'>A person changed the policy to <b>{esc(policy_label(inc['human_policy']))}</b> in the severity decision.</span>")
+    md(f"<div class='small' style='margin:2px 0 6px 0'><i>{esc(p['definition'])}</i></div>")
+    why = policies.why_matched(a, key)
+    if why:
+        st.markdown("**Why it matched**\n" + "\n".join(f"- {w}" for w in why))
+    st.markdown(f"**Severity guidance:** {p['severity_guidance']}")
+    if sug[1:]:
+        st.markdown("**Other matching policies:** " + ", ".join(policy_label(x) for x in sug[1:]))
+    shown = inc["human_policy"] or key
+    sp = policies.get(shown)
+    with st.expander(f"Escalation contacts and review checklist: {policy_label(shown)}"):
+        st.markdown("**Escalation contacts** (roles)\n" + "\n".join(f"- {x}" for x in sp["escalation"]))
+        st.markdown("**Review checklist**\n" + "\n".join(f"- {x}" for x in sp["checklist"]))
+        st.caption("From the synthetic policy library (Rules & playbooks → Policies).")
 
 
 def _source(inc, intake) -> None:
@@ -244,10 +276,11 @@ def _ai_analysis(inc, intake, a) -> None:
                     st.markdown(f"- {t}")
         if a["status"] == "valid":
             o = a["output"]
-            st.markdown("#### 2. Summary")
+            _policy_section(inc, a)
+            st.markdown("#### 3. Summary")
             st.write(o["summary"])
 
-            st.markdown("#### 3. Facts the AI found")
+            st.markdown("#### 4. Facts the AI found")
             st.caption("Each fact is shown with the source evidence it cites (📄). Mark whether that evidence supports it.")
             ev = {e.evidence_id: e for e in intake.evidence}
             latest = {r["fact_index"]: r["verdict"] for r in rows(c, "SELECT fact_index, verdict FROM claim_reviews WHERE assessment_id=? ORDER BY review_id", (a["assessment_id"],))}
@@ -270,7 +303,7 @@ def _ai_analysis(inc, intake, a) -> None:
                          default=latest.get(i), on_change=_save, disabled=not can_review, label_visibility="collapsed")
             feedback("claims")
 
-            st.markdown("#### 4. Open questions")
+            st.markdown("#### 5. Open questions")
             st.markdown("**Missing information**")
             st.markdown("\n".join(f"- {m}" for m in o["missing_information"]) or "- None listed")
             st.markdown("**Conflicting evidence**")
@@ -280,7 +313,7 @@ def _ai_analysis(inc, intake, a) -> None:
                 st.markdown(f"- _{esc(h['statement'])}_" + (f" <span class='small'>({esc(h['basis'])})</span>" if h["basis"] else ""), unsafe_allow_html=True)
 
             if o["next_steps"]:
-                st.markdown("#### 5. Suggested next steps")
+                st.markdown("#### 6. Suggested next steps")
                 st.markdown("\n".join(f"- {s}" for s in o["next_steps"]))
 
         with st.expander("How this was produced"):
@@ -374,10 +407,11 @@ def _related(inc) -> None:
 
 def _decision_card(inc, intake, a) -> None:
     with st.container(border=True):
-        st.markdown("**Severity & routing decision**")
+        st.markdown("**Severity, policy & routing decision**")
         if inc["human_severity"]:
             md(f"Current: {sev_badge(inc['human_severity'], 'confirmed')} → <b>{ROUTE_LABEL[inc['human_route']]}</b>"
-               f"<span class='small'> · {esc(actor_name(inc['severity_decided_by']))}, {ago(inc['severity_decided_at'])}</span>")
+               f"<span class='small'> · {esc(actor_name(inc['severity_decided_by']))}, {ago(inc['severity_decided_at'])}</span>"
+               + (f"<br>Policy: <b>{esc(policy_label(inc['human_policy']))}</b>" if inc["human_policy"] else ""))
         if inc["status"] in CLOSED:
             st.caption("Reopen the case to change the decision.")
             return
@@ -400,20 +434,32 @@ def _decision_form(inc, intake, a, hint) -> None:
     route = c2.selectbox("Owning team (route)", ROUTES, index=ROUTES.index(d_route), format_func=ROUTE_LABEL.get,
                          key=f"d_route_{iid}", disabled=bool(hint))
     teams = st.multiselect("Teams involved", TEAMS, default=[t for t in d_teams if t in TEAMS], key=f"d_teams_{iid}", disabled=bool(hint))
+    sug = policies.suggested(a)
+    ai_pol = sug[0] if sug else None
+    d_pol = inc["human_policy"] or ai_pol or "benign_noise"
+    keys = policies.keys()
+    pol = st.selectbox("Policy violated", keys, index=keys.index(d_pol), format_func=policy_label, key=f"d_pol_{iid}",
+                       disabled=bool(hint), help="Suggested by the AI and rules. See Rules & playbooks → Policies for definitions.")
+    d_other = json.loads(inc["human_policies_json"] or "null") if inc["human_policy"] else sug[1:]
+    others = st.multiselect("Other policies (optional)", [k for k in keys if k not in (pol, "benign_noise")],
+                            default=[k for k in (d_other or []) if k not in (pol, "benign_noise")], format_func=policy_label,
+                            key=f"d_pols_{iid}", disabled=bool(hint))
     need_ev = sev in ("P0", "P1") or ai_sev in ("P0", "P1")
     evr = st.multiselect("Source evidence I reviewed" + (" (required)" if need_ev else ""), [e.evidence_id for e in intake.evidence],
                          key=f"d_ev_{iid}", disabled=bool(hint))
-    override = bool(a) and (sev != ai_sev or route != ai_route)
+    override = bool(a) and (sev != ai_sev or route != ai_route or (ai_pol is not None and pol != ai_pol))
     code = None
     if override:
-        md(f"<span class='small'>Differs from the AI recommendation after controls ({ai_sev} → {ROUTE_LABEL[ai_route]}). "
+        md(f"<span class='small'>Differs from the AI recommendation after controls ({ai_sev} → {ROUTE_LABEL[ai_route]}"
+           f"{', ' + esc(policy_label(ai_pol)) if ai_pol else ''}). "
            "This is recorded as an override and needs a reason.</span>")
         code = st.selectbox("Override reason", list(wf.OVERRIDE_REASONS), format_func=wf.OVERRIDE_REASONS.get, key=f"d_code_{iid}", disabled=bool(hint))
     needs_text = override or (inc["human_severity"] and inc["human_severity"] != sev)
     reason = st.text_area("Rationale" + (" (required)" if needs_text else " (optional)"), height=80, key=f"d_reason_{iid}", disabled=bool(hint))
     label = "Record override" if override else ("Confirm AI recommendation" if a and not inc["human_severity"] else "Record decision")
     if st.button(label, type="primary", disabled=bool(hint), help=hint, key=f"d_btn_{iid}", use_container_width=True):
-        run_action(lambda: wf.decide_severity(c, iid, current_actor(), sev, route, teams, reason, code, evr),
+        run_action(lambda: wf.decide_severity(c, iid, current_actor(), sev, route, teams, reason, code, evr,
+                                              policy=pol, other_policies=others),
                    "Decision recorded", area=f"dec_{iid}")
         st.rerun()
     if hint:
@@ -588,7 +634,8 @@ def _closure_card(inc) -> None:
         elif status in CLOSED:
             cl = json.loads(inc["closure_json"])
             md(f"{badge('Closed', 'b-human')} {sev_badge(cl['final_severity'])} {pretty(cl['closure_category'])}<br>"
-               f"<span class='small'>Root cause: {esc(cl['root_cause'])}<br>Impact: {esc(cl['user_customer_impact'])}<br>"
+               + (f"<span class='small'>Policy: <b>{esc(policy_label(inc['human_policy']))}</b></span><br>" if inc["human_policy"] else "")
+               + f"<span class='small'>Root cause: {esc(cl['root_cause'])}<br>Impact: {esc(cl['user_customer_impact'])}<br>"
                f"Remaining: {esc(cl['remaining_mitigation'])} · Monitoring: {'yes' if cl['monitoring_required'] else 'no'}</span>")
             b1, b2 = st.columns(2)
             if status == "CLOSED":
@@ -639,7 +686,8 @@ def render() -> None:
 
     md(f"{sev_badge(sev, BASIS_LABEL[basis])} <span class='muted'>{iid}</span>")
     st.markdown(f"## {esc(inc['title'])}")
-    chips = [phase_badge(inc["status"]), badge("Owner: " + (actor_name(inc["owner"]) if inc["owner"] else "unassigned")),
+    pol, pol_basis, _ = wf.effective_policy(c, inc)
+    chips = [phase_badge(inc["status"]), policy_badge(pol, pol_basis), badge("Owner: " + (actor_name(inc["owner"]) if inc["owner"] else "unassigned")),
              source_badge(a["provider_kind"] if a else "none")]
     if row["overdue"]:
         chips.append(badge("⚠️ SLA: first review " + relative(row["minutes_to_deadline"]), "b-p0"))

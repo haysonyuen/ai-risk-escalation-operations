@@ -5,9 +5,9 @@ import json
 import pandas as pd
 import streamlit as st
 
-from common import (CATEGORY_LABEL, OVERRIDE_DIRECTION, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE,
-                    actor_name, conn, go, go_case, phase, pretty, stage, ver, GATE_LABEL, SOURCE_LABEL, SPLIT_NAME)
-from riskops import config, monitoring, workflow as wf
+from common import (OVERRIDE_DIRECTION, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE,
+                    actor_name, conn, go, go_case, phase, policy_label, pretty, stage, ver, GATE_LABEL, SOURCE_LABEL, SPLIT_NAME)
+from riskops import config, monitoring, policies, workflow as wf
 from riskops.db import get_setting, rows
 
 
@@ -33,8 +33,14 @@ def _status_section() -> None:
     q = monitoring.queue(conn())
     picked = st.pills("Status", PHASES, selection_mode="multi", default=PHASES, key="d_phases",
                       help=" · ".join(f"{k}: {v}" for k, v in PHASE_HELP.items())) or []
-    sevs = st.pills("Severity", ["P0", "P1", "P2", "P3"], selection_mode="multi", default=["P0", "P1", "P2", "P3"], key="d_sevs") or []
-    items = [x for x in q if phase(x["status"]) in picked and x["effective_severity"] in sevs]
+    sv, pf = st.columns([2, 3], vertical_alignment="bottom")
+    with sv:
+        sevs = st.pills("Severity", ["P0", "P1", "P2", "P3"], selection_mode="multi", default=["P0", "P1", "P2", "P3"], key="d_sevs") or []
+    present = {x["policy"] for x in q if x["policy"]}
+    st.session_state["d_policy"] = [k for k in st.session_state.get("d_policy", []) if k in present]
+    pols = pf.multiselect("Policy", [k for k in policies.keys() if k in present], format_func=policy_label, key="d_policy",
+                          placeholder="All policies")
+    items = [x for x in q if phase(x["status"]) in picked and x["effective_severity"] in sevs and (not pols or x["policy"] in pols)]
     open_items = [x for x in items if x["status"] in monitoring.OPEN]
     k1, k2, k3 = st.columns(3)
     k1.metric("⏸️ Auto-paused (C7)", sum(1 for x in items if x["auto_paused"]), help="Waiting for the Safety specialist or Incident Lead")
@@ -53,7 +59,8 @@ def _status_section() -> None:
     table = pd.DataFrame([{
         "ID": x["incident_id"], "Severity": x["effective_severity"] + (" ✓" if x["severity_basis"] == "human" else " · AI"),
         "Status": phase(x["status"]) + (" ⏸️" if x["auto_paused"] else ""), "Stage": STATUS_LABEL[x["status"]],
-        "Title": x["title"], "Age (h)": x["age_hours"], "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
+        "Title": x["title"], "Policy": policy_label(x["policy"]) + (" ✓" if x["policy_basis"] == "human" else ""),
+        "Age (h)": x["age_hours"], "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
         "Next action": x["next_actions"][0]["title"] if x["next_actions"] else "—"} for x in sorted(
             items, key=lambda x: (STATUS_PHASE[x["status"]], STATUS_STAGE[x["status"]], {"P0": 0, "P1": 1, "P2": 2, "P3": 3}[x["effective_severity"]]))])
     st.caption(f"{len(table)} ticket(s) · click a column header to sort · click a row to open the case")
@@ -144,19 +151,29 @@ def render() -> None:
         st.dataframe(pd.DataFrame([{"Override reason": wf.OVERRIDE_REASONS.get(k, pretty(k)), "Count": v} for k, v in o["by_reason"].items()]
                                   or [{"Override reason": "none", "Count": 0}]), hide_index=True, use_container_width=True)
         st.caption("Direction: " + (" · ".join(f"{OVERRIDE_DIRECTION.get(k, pretty(k))}: {v}" for k, v in o["by_direction"].items()) or "—"))
+        st.metric("Policy changed by a person", o["policy_changed"],
+                  help="Decisions where the confirmed policy differs from the AI/rules suggestion. A signal of where policy matching needs work.")
     with b:
-        st.subheader("Issue categories")
-        st.caption("Counts only — there is no usage denominator, so no recurrence rates.")
-        cats = pd.DataFrame([{"Category": CATEGORY_LABEL.get(k, k), "Cases": v} for k, v in m["category_counts"].items()])
-        if cats.empty:
-            st.info("No categorised cases yet.")
+        st.subheader("Cases by policy")
+        open_only = st.toggle("Open cases only", value=False, key="d_pol_open")
+        qq = [x for x in monitoring.queue(conn()) if x["policy"] and (not open_only or x["status"] in monitoring.OPEN)]
+        pol_df = pd.DataFrame([{"Policy": policy_label(x["policy"]), "Severity": x["effective_severity"]} for x in qq])
+        if pol_df.empty:
+            st.info("No cases with a policy yet.")
         else:
             import altair as alt
-            chart = (alt.Chart(cats).mark_bar(color="#d9473a", cornerRadiusEnd=3)
-                     .encode(x=alt.X("Cases:Q", axis=alt.Axis(tickMinStep=1, title="Cases")),
-                             y=alt.Y("Category:N", sort="-x", title=None, axis=alt.Axis(labelLimit=260)), tooltip=["Category", "Cases"])
-                     .properties(height=max(200, 26 * len(cats))))
+            counts = pol_df.groupby(["Policy", "Severity"], as_index=False).size().rename(columns={"size": "Cases"})
+            order = pol_df["Policy"].value_counts().index.tolist()
+            chart = (alt.Chart(counts).mark_bar()
+                     .encode(x=alt.X("sum(Cases):Q", axis=alt.Axis(tickMinStep=1, title="Cases")),
+                             y=alt.Y("Policy:N", sort=order, title=None, axis=alt.Axis(labelLimit=260, labelOverlap=False)),
+                             color=alt.Color("Severity:N", scale=alt.Scale(domain=list(SEV_COLORS), range=list(SEV_COLORS.values())),
+                                             legend=alt.Legend(orient="top", title=None)),
+                             order=alt.Order("Severity:N", sort="ascending"),
+                             tooltip=["Policy", "Severity", "Cases"])
+                     .properties(height=40 + 30 * len(order)))
             st.altair_chart(chart, use_container_width=True)
+            st.caption("Primary policy per case: confirmed by a person where decided, otherwise the AI/rules suggestion.")
 
     st.subheader("AI assessment health")
     f1, f2 = st.columns(2)

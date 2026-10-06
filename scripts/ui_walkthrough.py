@@ -139,12 +139,15 @@ def _steps(ui: UI) -> None:
     ui.expect("AI assessed · awaiting triage")  # stage detail line
     ui.expect("What was reported")  # Summary tab: source card
     ui.expect("What the AI concluded")  # Summary tab: AI card
+    ui.expect("Likely policy:")
+    ui.expect("Policy: Enterprise data leakage (DL-01) · AI-suggested")  # header chip
     ui.shot("case_after_import")
 
     print("2. AI assessment with evidence and unknowns (offline fixture)")
     ui.section("AI analysis")
+    ui.expect("2. Policy and why")
     ui.expect("does not exist in this case")
-    ui.p.get_by_text("3. Facts the AI found").first.scroll_into_view_if_needed()
+    ui.p.get_by_text("4. Facts the AI found").first.scroll_into_view_if_needed()
     ui.shot("ai_assessment_facts")
 
     print("3. Human correction with a recorded reason")
@@ -155,10 +158,11 @@ def _steps(ui: UI) -> None:
                                     "Treat as highly credible exposure until access is ruled out. E5 cited by the AI does not exist.")
     ui.button("Record override")
     ui.expect("P0 · confirmed")
+    ui.expect("Enterprise data leakage (DL-01) · ✓ confirmed")  # policy confirmed with the decision
     ui.expect("Stage 3 of 8: Triaged")
     ui.select("Owner", "Jordan")
     ui.button("Assign")
-    ui.p.get_by_text("Severity & routing decision").first.scroll_into_view_if_needed()
+    ui.p.get_by_text("Severity, policy & routing decision").first.scroll_into_view_if_needed()
     ui.shot("decision_recorded")
 
     print("4. Specialist routing and simulated containment approval")
@@ -220,6 +224,9 @@ def _steps(ui: UI) -> None:
 
     print("7. Rule change followed by regression evaluation on the frozen held-out split")
     ui.nav("Rules & playbooks")
+    ui.section("Policies")
+    ui.expand("CS-01 · Child safety")
+    ui.expect("Review checklist")
     ui.section("Change rules + regression check")
     ui.select("New active version", "rules-v2.1")
     ui.fill("Rationale", "Adopt dev-derived fixes (blocked-attempt refusal, appeal routing, agent external actions) pending regression check.")
@@ -229,6 +236,7 @@ def _steps(ui: UI) -> None:
     ui.shot("regression_check")
     ui.nav("Dashboard")
     ui.expect("Tickets by status")
+    ui.expect("Cases by policy")
     ui.shot("dashboard")
     ui.expand("Breakdown by stage")
     ui.nav("Quality & evaluation")

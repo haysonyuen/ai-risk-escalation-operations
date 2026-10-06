@@ -3,8 +3,8 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from common import GATE_LABEL, SPLIT_NAME, section, badge, conn, current_actor, flash, md, run_action, ver
-from riskops import config, evaluation, monitoring, workflow as wf
+from common import ROUTE_LABEL, GATE_LABEL, SPLIT_NAME, section, badge, conn, current_actor, flash, md, run_action, ver
+from riskops import config, evaluation, monitoring, policies, workflow as wf
 from riskops.assessment import CONTROLS_VERSION
 from riskops.db import get_setting, rows
 from riskops.rules import available_versions, load_rules
@@ -18,6 +18,25 @@ def _conds(r: dict) -> str:
     return " AND ".join(parts)
 
 
+def _policies() -> None:
+    lib = policies.library()
+    st.markdown(f"**Policy library** ({ver(lib['version'])}): one policy per harm area. The AI and the rules suggest a policy for each case; "
+                "a person confirms it in the severity decision.")
+    st.caption(lib["note"])
+    q = st.text_input("Find a policy", placeholder="Name, code or team", label_visibility="collapsed", key="pol_q")
+    for p in policies.all_policies():
+        text = " ".join([p["name"], p["code"], p["definition"], ROUTE_LABEL.get(p["owning_team"], "")]).lower()
+        if q and q.lower() not in text:
+            continue
+        with st.expander(f"{p['code']} · {p['name']}"):
+            st.markdown(f"_{p['definition']}_")
+            st.markdown(f"**Owning team:** {ROUTE_LABEL.get(p['owning_team'], p['owning_team'])}  \n**Severity guidance:** {p['severity_guidance']}")
+            c1, c2, c3 = st.columns(3)
+            c1.markdown("**What usually points to it**\n" + "\n".join(f"- {x}" for x in p["signals"]))
+            c2.markdown("**Escalation contacts** (roles)\n" + "\n".join(f"- {x}" for x in p["escalation"]))
+            c3.markdown("**Review checklist**\n" + "\n".join(f"- {x}" for x in p["checklist"]))
+
+
 def render() -> None:
     st.title("Rules & playbooks")
     c = conn()
@@ -29,7 +48,7 @@ def render() -> None:
         active = versions[0]
     md(f"Active: {badge('Rules ' + ver(active), 'b-rules')} · {badge('safety controls ' + ver(CONTROLS_VERSION), 'b-muted')} · "
        f"{badge('prompt ' + ver(get_setting(c, 'active_prompt_version')), 'b-muted')}")
-    _labels = ["Readable rules", "Change rules + regression check", "Controls, prompts & SLA", "Severity framework"]
+    _labels = ["Readable rules", "Policies", "Change rules + regression check", "Controls, prompts & SLA", "Severity framework"]
     sec = section(_labels, key="r_section")
     if sec == _labels[0]:
         v = st.selectbox("Version", versions, index=versions.index(active))
@@ -61,6 +80,8 @@ def render() -> None:
             st.dataframe(pd.DataFrame([{"level": x["level"], "when": _conds(x)} for x in r["impact_rules"]]), hide_index=True)
             st.dataframe(pd.DataFrame([{"category": x["category"], "when": _conds(x)} for x in r["category_rules"]]), hide_index=True)
     elif sec == _labels[1]:
+        _policies()
+    elif sec == _labels[2]:
         st.markdown("Changing the active version is governed (Incident Lead only), requires a rationale, is logged, and **does not modify** "
                     "any existing assessment or human decision. Cases keep the version they were assessed with until re-assessed.")
         with st.form("change_rules"):
@@ -103,7 +124,7 @@ def render() -> None:
         if ev:
             st.markdown("**Rule change log**")
             st.dataframe(pd.DataFrame(ev), use_container_width=True, hide_index=True)
-    elif sec == _labels[2]:
+    elif sec == _labels[3]:
         st.markdown(f"**Always-on safety controls ({ver(CONTROLS_VERSION)})**: fixed checks applied after the AI, independent of rules version")
         st.markdown("""
 | Control | What it does |
@@ -125,7 +146,7 @@ def render() -> None:
         sla = config.sla_config()
         st.caption(sla["note"])
         st.dataframe(pd.DataFrame(sla["targets_minutes"]).T, use_container_width=True)
-    elif sec == _labels[3]:
+    elif sec == _labels[4]:
         st.markdown("""
 | Tier | Decision standard | Response posture |
 | --- | --- | --- |

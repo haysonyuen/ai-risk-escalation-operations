@@ -3,9 +3,9 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from common import (drop_stale, CATEGORY_LABEL, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE, actor_name, conn,
+from common import (drop_stale, policy_label, PHASE_HELP, PHASES, STAGES, STATUS_LABEL, STATUS_PHASE, STATUS_STAGE, actor_name, conn,
                     current_actor, go, go_case, phase, relative, stage)
-from riskops import monitoring, workflow as wf
+from riskops import monitoring, policies, workflow as wf
 
 VIEWS = ["Needs action", "My cases", "All open", "Closed", "All"]
 SORTS = {
@@ -28,7 +28,7 @@ def render() -> None:
     q = monitoring.queue(c)
     open_q = [x for x in q if x["status"] in monitoring.OPEN]
 
-    for key, opts in (("q_sort", list(SORTS)), ("q_stage", STAGES), ("q_phase", PHASES)):
+    for key, opts in (("q_sort", list(SORTS)), ("q_stage", STAGES), ("q_phase", PHASES), ("q_policy", policies.keys())):
         drop_stale(key, opts)
     head, btn = st.columns([5, 1], vertical_alignment="center")
     head.title("Incident queue")
@@ -44,13 +44,15 @@ def render() -> None:
 
     v, s, f = st.columns([3, 2, 1])
     view = v.segmented_control("View", VIEWS, default="Needs action", key="q_view", label_visibility="collapsed") or "Needs action"
-    search = s.text_input("Search", placeholder="Search ID or title", label_visibility="collapsed", key="q_search")
+    search = s.text_input("Search", placeholder="Search ID, title or policy", label_visibility="collapsed", key="q_search")
     with f.popover("Filters", use_container_width=True):
         phases = st.multiselect("Status", PHASES, key="q_phase",
                                 help=" · ".join(f"{k}: {v}" for k, v in PHASE_HELP.items()))
         sev = st.multiselect("Severity", ["P0", "P1", "P2", "P3"], key="q_sev")
-        cats = sorted({cat for x in q for cat in x["categories"]})
-        cat = st.multiselect("Category", cats, format_func=lambda k: CATEGORY_LABEL.get(k, k), key="q_cat")
+        present = {p for x in q for p in [x["policy"], *x["other_policies"]] if p}
+        pol = st.multiselect("Policy", [k for k in policies.keys() if k in present], format_func=policy_label, key="q_policy")
+        pol_any = st.checkbox("Also match other policies on the case", key="q_policy_any",
+                              help="Off: primary policy only. On: primary or any other policy on the case.")
         owners = sorted({x["owner"] for x in q if x["owner"]})
         owner = st.multiselect("Owner", ["(unassigned)"] + owners, format_func=lambda k: k if k == "(unassigned)" else actor_name(k), key="q_owner")
         review = st.radio("Mandatory review", ["Any", "Flagged", "Not flagged"], horizontal=True, key="q_review")
@@ -69,7 +71,8 @@ def render() -> None:
             return False
         if view == "Closed" and is_open:
             return False
-        if search and search.lower() not in (x["incident_id"] + " " + x["title"]).lower():
+        if search and search.lower() not in " ".join([x["incident_id"], x["title"], policy_label(x["policy"])]
+                                                     + [policy_label(p) for p in x["other_policies"]]).lower():
             return False
         if sev and x["effective_severity"] not in sev:
             return False
@@ -77,7 +80,7 @@ def render() -> None:
             return False
         if stages and stage(x["status"]) not in stages:
             return False
-        if cat and not set(cat) & set(x["categories"]):
+        if pol and not set(pol) & ({x["policy"]} | (set(x["other_policies"]) if pol_any else set())):
             return False
         if owner and (x["owner"] or "(unassigned)") not in owner:
             return False
@@ -111,6 +114,8 @@ def render() -> None:
             "Severity": f"{x['effective_severity']} {basis_short[x['severity_basis']]}",
             "ID": x["incident_id"],
             "Title": x["title"],
+            "Policy": (policy_label(x["policy"]) + (" ✓" if x["policy_basis"] == "human" else " · AI" if x["policy"] else "")
+                       + (f" +{len(x['other_policies'])}" if x["other_policies"] else "")),
             "Status": status,
             "Stage": STATUS_LABEL[x["status"]],
             "Flags": " ".join(flags),
@@ -133,6 +138,8 @@ def render() -> None:
 
 **Flags**: ⚑ mandatory review pending · 🧪 fault-injection test data
 
+**Policy**: the policy the case may violate, with its code. `✓` a person confirmed it · `AI` suggested, not confirmed · `+1` more policies on the case. Hover a policy on the case page for its definition.
+
 **Next action**: 🔒 means your current role can't do it. Switch roles with *Working as* in the sidebar.
 
 """)
@@ -147,7 +154,8 @@ def render() -> None:
         column_config={
             "Severity": st.column_config.TextColumn(width=86, help="✓ = human-confirmed. AI = recommendation after safety controls, not yet confirmed."),
             "ID": st.column_config.TextColumn(width=72),
-            "Title": st.column_config.TextColumn(width=230),
+            "Title": st.column_config.TextColumn(width=210),
+            "Policy": st.column_config.TextColumn(width=190, help="Policy the case may violate (code). ✓ confirmed by a person · AI suggested · +N other policies"),
             "Status": st.column_config.TextColumn(width=128, help="Awaiting triage · In progress · Closed. ⏸️ auto-paused (C7) · ⚠️ SLA overdue"),
             "Stage": st.column_config.TextColumn(width=215, help="Detail within the status: Intake, AI assessment, Triage, Investigation, Containment, Response, Closure, QA review"),
             "Next action": st.column_config.TextColumn(width=186),
