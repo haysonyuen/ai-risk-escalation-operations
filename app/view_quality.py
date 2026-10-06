@@ -114,7 +114,7 @@ def _headline(runs: list[dict]) -> None:
         return
     m = s["metrics"]
     a = m["after_deterministic_controls"]
-    st.markdown(f"**Current results:** {run_name(s)} &nbsp;·&nbsp; <span class='small'>after safety controls</span>", unsafe_allow_html=True)
+    st.markdown(f"**Current results:** {run_name(s)} &nbsp;·&nbsp; <span class='small'>after safety checks</span>", unsafe_allow_html=True)
     active = get_setting(conn(), "active_rule_version")
     if s["rule_version"] != active:
         st.caption(f"No held-out run for the active Rules {ver(active)} yet; showing {run_name(s)}. Run one under **Run evaluation**.")
@@ -167,15 +167,15 @@ def _results(runs: list[dict]) -> None:
         ("Auto-pause precision", "Pauses that were warranted", None, c7["precision"] if c7 else None),
     ]
     st.dataframe(pd.DataFrame([{"Metric": n, "What it measures": d, "AI recommendation": fmt(x) if x else "",
-                                "After safety controls": fmt(y)} for n, d, x, y in tbl]),
+                                "After safety checks": fmt(y)} for n, d, x, y in tbl]),
                  use_container_width=True, hide_index=True,
                  column_config={"AI recommendation": st.column_config.TextColumn(help="The AI's suggestion before any checks (valid outputs only)"),
-                                "After safety controls": st.column_config.TextColumn(help="Final result after the fixed safety controls (all cases)")})
+                                "After safety checks": st.column_config.TextColumn(help="Final result after the fixed safety checks (all cases)")})
 
     c1, c2 = st.columns([2, 3])
     with c1:
         st.markdown("**Severity: expected vs given**")
-        st.caption("Rows: expected severity. Columns: severity given after safety controls. The diagonal is correct.")
+        st.caption("Rows: expected severity. Columns: severity given after safety checks. The diagonal is correct.")
         cm = pd.DataFrame(a["confusion_matrix_expected_rows_predicted_cols"]).T.reindex(columns=["P0", "P1", "P2", "P3", "none"], fill_value=0)
         cm = cm.rename(columns={"none": "no result"})
         cm.index.name = "Expected"
@@ -190,7 +190,7 @@ def _results(runs: list[dict]) -> None:
             return out
         st.dataframe(cm.style.apply(shade, axis=None), use_container_width=True)
     with c2:
-        st.markdown("**By scenario group** (after safety controls)")
+        st.markdown("**By scenario group** (after safety checks)")
         st.dataframe(pd.DataFrame([{"Group": k.replace("_", " ").title(), "Cases": v["n"],
                                     "Severity within range": fmt(v["severity_within_range_after_controls"]),
                                     "Route acceptable": fmt(v["route_acceptable_after_controls"]),

@@ -127,3 +127,7 @@ Symbols such as ⏸️ ⚠️ ⚑ 🧪 ✓ and "+2" needed decoding, and Streaml
 * The "you can do this" pill was removed from the Next panel; when a step belongs to another role, that role is shown in plain brackets.
 * Source cards are labelled **📄 Source data · reported**.
 * AI cards say **✨ AI-generated · requires human confirmation** until a person decides, then **reviewed by <name> (confirmed / overridden)**.
+
+## Eighth review: how a recommendation was reached
+
+The side-by-side "AI recommends" / "After safety controls" boxes read as two competing recommendations and did not say what happened. *AI analysis → 1. Recommendation* now shows **one recommendation** (severity, team, policy) and a **How we got here** trail: ① what the AI suggested, ② what the safety checks changed, in a sentence each (or "No change"), and ③ any automatic action (only the session pause exists; otherwise "None. Nothing was done to any system"). "Safety controls" are called **safety checks** in operator views, and the AI's signals are labelled **AI's own read**.
