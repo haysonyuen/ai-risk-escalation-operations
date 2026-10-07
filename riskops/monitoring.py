@@ -103,6 +103,40 @@ def _stats(vals: list[float]) -> dict:
             "max_min": round(max(vals), 1) if vals else None}
 
 
+def timeliness_by_severity(conn, now: datetime | None = None) -> list[dict]:
+    """Per severity: SLA targets, how many decided cases met the first-review target, median time,
+    and how many open cases are overdue or still within target. Uses the human severity where decided."""
+    now = now or datetime.now(timezone.utc)
+    out = {s: {"severity": s, "first_target_min": config.sla_minutes(s, "first_human_review"),
+               "containment_target_min": config.sla_minutes(s, "containment_or_escalation"),
+               "reviewed": 0, "met": 0, "times": [], "contained": 0, "contained_met": 0, "open_overdue": 0, "open_waiting": 0}
+           for s in ("P0", "P1", "P2", "P3")}
+    for inc in rows(conn, "SELECT * FROM incidents"):
+        rep = _dt(inc["reported_at"])
+        ev = rows(conn, "SELECT ts FROM events WHERE incident_id=? AND event_type IN ('human_severity_confirmed','human_override')"
+                        " ORDER BY ts, event_id LIMIT 1", (inc["incident_id"],))
+        sev = inc["human_severity"] or effective_severity(conn, inc)[0]
+        o = out[sev]
+        if ev:
+            m = _minutes(rep, _dt(ev[0]["ts"]))
+            o["reviewed"] += 1
+            o["times"].append(m)
+            o["met"] += int(o["first_target_min"] is not None and m <= o["first_target_min"])
+        elif inc["status"] in OPEN and o["first_target_min"]:
+            late = _minutes(rep, now) > o["first_target_min"]
+            o["open_overdue" if late else "open_waiting"] += 1
+        ce = rows(conn, "SELECT ts FROM events WHERE incident_id=? AND event_type='containment_approved' ORDER BY ts, event_id LIMIT 1",
+                  (inc["incident_id"],))
+        if ce and o["containment_target_min"]:
+            o["contained"] += 1
+            o["contained_met"] += int(_minutes(rep, _dt(ce[0]["ts"])) <= o["containment_target_min"])
+    for o in out.values():
+        o["median_min"] = round(statistics.median(o["times"]), 1) if o["times"] else None
+        o["max_min"] = round(max(o["times"]), 1) if o["times"] else None
+        del o["times"]
+    return list(out.values())
+
+
 def ops_metrics(conn, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     incs = rows(conn, "SELECT * FROM incidents")
