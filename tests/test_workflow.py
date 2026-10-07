@@ -22,7 +22,7 @@ def _p0_case(conn, actors):
 
 
 def _closure(sev, evidence=("E1",), **kw):
-    base = {"closure_category": "confirmed_safety_incident", "final_severity": sev, "root_cause": "Gating gap in tool path",
+    base = {"closure_category": "confirmed_safety_incident", "final_severity": sev, "violation_confirmed": "yes", "root_cause": "Gating gap in tool path",
             "user_customer_impact": "No order placed", "evidence_reviewed": list(evidence), "teams_involved": ["Safety"],
             "actions_taken": "Paused transactions (simulated)", "response_status": "Draft approved, not sent",
             "remaining_mitigation": "Gating fix", "monitoring_required": True, "sign_off_statement": "Reviewed all evidence and actions."}
@@ -86,19 +86,19 @@ def test_containment_expiry_and_reversal(conn, actors):
 def test_override_requires_reason_and_code(conn, actors):
     iid = _p0_case(conn, actors)
     with pytest.raises(wf.WorkflowError, match="evidence"):
-        wf.decide_severity(conn, iid, actors["alex.riskops"], "P0", "safety", ["Safety"])
+        wf.decide_severity(conn, iid, actors["sam.lead"], "P0", "safety", ["Safety"])
     with pytest.raises(wf.WorkflowError, match="reason code"):
-        wf.decide_severity(conn, iid, actors["alex.riskops"], "P1", "safety", ["Safety"], evidence_reviewed=["E1"], reason="long enough reason")
+        wf.decide_severity(conn, iid, actors["sam.lead"], "P1", "safety", ["Safety"], evidence_reviewed=["E1"], reason="long enough reason")
     with pytest.raises(wf.WorkflowError, match="20 characters"):
-        wf.decide_severity(conn, iid, actors["alex.riskops"], "P2", "safety", ["Safety"], evidence_reviewed=["E1"],
+        wf.decide_severity(conn, iid, actors["sam.lead"], "P2", "safety", ["Safety"], evidence_reviewed=["E1"],
                            reason="too short ok", override_reason_code="false_positive")
     with pytest.raises(wf.WorkflowError, match="Unknown evidence"):
-        wf.decide_severity(conn, iid, actors["alex.riskops"], "P0", "safety", ["Safety"], evidence_reviewed=["E9"])
-    out = wf.decide_severity(conn, iid, actors["alex.riskops"], "P1", "safety", ["Safety"], evidence_reviewed=["E1"],
+        wf.decide_severity(conn, iid, actors["sam.lead"], "P0", "safety", ["Safety"], evidence_reviewed=["E9"])
+    out = wf.decide_severity(conn, iid, actors["sam.lead"], "P1", "safety", ["Safety"], evidence_reviewed=["E1"],
                              reason="Offer was not actionable per E1", override_reason_code="policy_interpretation")
     assert out["override"]
     ev = rows(conn, "SELECT * FROM events WHERE event_type='human_override'")[0]
-    assert ev["actor_id"] == "alex.riskops" and '"P0"' not in ev["previous_value"] and '"P1"' in ev["new_value"]
+    assert ev["actor_id"] == "sam.lead" and '"P0"' not in ev["previous_value"] and '"P1"' in ev["new_value"]
     assert "policy_interpretation" in ev["details_json"]
 
 
@@ -194,7 +194,7 @@ def test_new_evidence_reopens_closed_case(conn, actors):
     wf.run_assessment(conn, "T-1", OfflineSimulationProvider(), rule_version="rules-v2.1")
     wf.decide_severity(conn, "T-1", actors["alex.riskops"], "P3", "support", ["Support"], reason="ok")
     wf.transition(conn, "T-1", "RESPONSE", actors["alex.riskops"])
-    wf.close_incident(conn, "T-1", _closure("P3", closure_category="user_misunderstanding_no_defect"), actors["alex.riskops"])
+    wf.close_incident(conn, "T-1", _closure("P3", closure_category="user_misunderstanding_no_defect", violation_confirmed="no"), actors["alex.riskops"])
     wf.add_evidence(conn, "T-1", Evidence(evidence_id="E2", source_type="tool_action_log", source_description="log",
                                           content="delete_file executed"), actors["lee.eng"])
     inc = wf.get_incident(conn, "T-1")
@@ -271,7 +271,9 @@ def test_next_actions_guide_by_status_and_role(conn, actors):
     assert acts[0]["title"].startswith("Confirm or lift the automatic pause") and acts[0]["urgent"]
     acts = acts[1:]
     assert acts[0]["title"] == "Decide severity and routing" and acts[0]["urgent"]
-    assert wf.actor_can_do(conn, actors["alex.riskops"], acts[0])
+    # P0 in a severe-harm policy area (CBRN): the specialist or the Incident Lead decides, not Risk Ops alone
+    assert wf.actor_can_do(conn, actors["sam.lead"], acts[0]) and wf.actor_can_do(conn, actors["priya.safety"], acts[0])
+    assert not wf.actor_can_do(conn, actors["alex.riskops"], acts[0])
     assert not wf.actor_can_do(conn, actors["casey.support"], acts[0])
     ca = wf.propose_containment(conn, iid, SYS, "pause_interaction", "session", "stop", source="ai")
     cont = [x for x in wf.next_actions(conn, iid) if x["title"] == "Decide on proposed containment"][0]

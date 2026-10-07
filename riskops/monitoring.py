@@ -64,11 +64,19 @@ def queue(conn, now: datetime | None = None) -> list[dict]:
             categories = list(a["output"]["risk_categories"]) + [c for c in categories if c not in a["output"]["risk_categories"]]
         categories = [c for c in categories if c != "benign_noise"] or categories
         pol, pol_basis, pol_other = effective_policy(conn, inc)
+        # Handoff: assigned by someone else and the owner has not acted on the case since.
+        handoff_to = None
+        asg = rows(conn, "SELECT event_id, actor_id, new_value FROM events WHERE incident_id=? AND event_type='owner_assigned'"
+                         " ORDER BY event_id DESC LIMIT 1", (inc["incident_id"],))
+        if asg and inc["owner"] and asg[0]["new_value"] == inc["owner"] and asg[0]["actor_id"] != inc["owner"]:
+            acted = rows(conn, "SELECT 1 FROM events WHERE incident_id=? AND actor_id=? AND event_id>? LIMIT 1",
+                         (inc["incident_id"], inc["owner"], asg[0]["event_id"]))
+            handoff_to = None if acted else inc["owner"]
         out.append({
             "incident_id": inc["incident_id"], "title": inc["title"], "status": inc["status"], "owner": inc["owner"] or "",
             "product_surface": intake.get("product_surface"), "customer_type": intake.get("customer_type"),
             "categories": categories,
-            "policy": pol, "policy_basis": pol_basis, "other_policies": pol_other,
+            "policy": pol, "policy_basis": pol_basis, "other_policies": pol_other, "handoff_to": handoff_to,
             "ai_severity": a["controlled_severity"] if a else None,
             "ai_model_severity": a["model_severity"] if a else None,
             "ai_source": a["provider_kind"] if a else "none",
@@ -195,6 +203,7 @@ def ops_metrics(conn, now: datetime | None = None) -> dict:
         else:
             nv, ai_rec = json.loads(d["new_value"]), json.loads(d["details_json"])["ai_recommendation"]
             directions["route_only" if nv.get("route") != ai_rec.get("route") else "policy_only"] += 1
+    manual_triage = sum(1 for d in decisions if json.loads(d["details_json"] or "{}").get("manual_triage"))
     policy_changed = 0
     for d in with_ai:
         ai_pol = json.loads(d["details_json"])["ai_recommendation"].get("policy")
@@ -224,7 +233,7 @@ def ops_metrics(conn, now: datetime | None = None) -> dict:
         "overrides": {"decisions_with_ai_recommendation": len(with_ai), "overrides": len(overrides),
                       "override_rate": (len(overrides) / len(with_ai)) if with_ai else None,
                       "by_reason": dict(reasons), "by_direction": dict(directions),
-                      "policy_changed": policy_changed},
+                      "policy_changed": policy_changed, "manual_triage": manual_triage},
         "category_counts": dict(cat_counts),
         "policy_counts": dict(Counter(x["policy"] for x in q if x["policy"])),
         "confirmed_links": {r["link_type"]: r["n"] for r in linked},

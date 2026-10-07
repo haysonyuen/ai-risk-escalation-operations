@@ -35,12 +35,17 @@ def render() -> None:
     if btn.button("＋ New report", type="primary", use_container_width=True):
         go("intake")
 
-    k1, k2, k3, k4, k5 = st.columns(5)
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
     k1.metric("Open", len(open_q))
     k2.metric("SLA overdue", sum(x["overdue"] for x in open_q))
     k3.metric("Open P0 / P1", sum(1 for x in open_q if x["effective_severity"] in ("P0", "P1")))
     k4.metric("Awaiting triage", sum(1 for x in open_q if not x["human_severity"]))
-    k5.metric("Actions I can take", sum(1 for x in open_q for a in x["next_actions"] if wf.actor_can_do(c, me, a)))
+    k6.metric("Assigned to me", sum(1 for x in open_q if x["owner"] == me.actor_id),
+              help=f"Open cases you own; {sum(1 for x in open_q if x['handoff_to'] == me.actor_id)} newly handed to you")
+    mine = [x for x in open_q if any(wf.actor_can_do(c, me, a) for a in x["next_actions"])]
+    k5.metric("Cases I can act on", len(mine),
+              help=f"Open cases with at least one next step your role can take "
+                   f"({sum(1 for x in open_q for a in x['next_actions'] if wf.actor_can_do(c, me, a))} steps in total)")
 
     v, s, f = st.columns([3, 2, 1])
     view = v.segmented_control("View", VIEWS, default="Needs action", key="q_view", label_visibility="collapsed") or "Needs action"
@@ -103,27 +108,27 @@ def render() -> None:
         due = ""
         if is_open and not x["human_severity"]:
             due = relative(x["minutes_to_deadline"]).capitalize()
+        who = "" if (not nxt or wf.actor_can_do(c, me, nxt)) else f" (needs {wf.who_can_do(nxt).split(' or ')[0]})"
         rows.append({
             "Severity": f"{x['effective_severity']} · {SEVERITY_BASIS_WORD[x['severity_basis']]}",
             "ID": x["incident_id"],
             "Title": x["title"],
-            "Code": policies.code(x["policy"]) if x["policy"] else "—",
-            "Policy": policy_with_more(x),
-            "Policy status": POLICY_STATUS_WORD[x["policy_basis"]],
-            "Status": phase(x["status"]),
-            "Alerts": " · ".join(alerts(x)),
-            "Stage": STATUS_LABEL[x["status"]],
-            "Next action": (nxt["title"] + ("" if wf.actor_can_do(c, me, nxt) else f" (needs {wf.who_can_do(nxt).split(' or ')[0]})")) if nxt else "—",
+            "Alerts": " · ".join(alerts(x, me.actor_id)),
+            "Next action": (nxt["title"] + who) if nxt else "—",
             "First review": due,
             "Owner": actor_name(x["owner"]).split(" —")[0] if x["owner"] else "—",
+            "Status": phase(x["status"]),
+            "Policy": (policies.code(x["policy"]) + " · " + policy_with_more(x)) if x["policy"] else "Not assessed",
+            "Policy status": POLICY_STATUS_WORD[x["policy_basis"]],
+            "Stage": STATUS_LABEL[x["status"]],
         })
     cap.caption(f"{len(rows)} case(s) · sorted by {sort_by[0].lower() + sort_by[1:]} · click a row to open it")
     with leg.popover("How to read this", use_container_width=True):
         st.markdown("""
 - **Severity**: P0 critical · P1 high · P2 medium · P3 low. *Confirmed* means a person decided; *AI-suggested* means not yet confirmed; *Needs manual triage* means the AI failed and the rules' estimate is shown as a placeholder.
-- **Code / Policy**: the policy the case may violate. *+N more* means other policies also match. **Policy status** says whether a person confirmed it.
+- **Policy**: code and name of the policy the case may violate. *+N more* means other policies also match. **Policy status** says whether a person confirmed it, or cleared it (no violation).
 - **Status**: Awaiting triage → In progress → Closed. **Stage** is the detail.
-- **Alerts**: *Session auto-paused* the system paused the reported conversation, a specialist must confirm or lift · *AI failed* no AI recommendation, triage manually · *SLA overdue* first review is late · *Review required* a person must review before any decision · *Test data* fault-injection test.
+- **Alerts**: *Assigned to you* newly handed to you · *QA required* closed P0/P1 needing an independent QA review · *Session auto-paused* the system paused the reported conversation, a specialist must confirm or lift · *AI failed* no AI recommendation, triage manually · *SLA overdue* first review is late · *Review required* a person must review before any decision · *Test data* fault-injection test.
 - **Next action**: *(needs …)* means another role must do it. Switch roles with *Working as* in the sidebar.
 """)
     if not rows:
@@ -133,16 +138,15 @@ def render() -> None:
     styled = df.style.map(lambda v: SEV_STYLE.get(str(v)[:2], ""), subset=["Severity"])
     event = st.dataframe(
         styled, hide_index=True, use_container_width=True, on_select="rerun", selection_mode="single-row",
-        key=f"q_table_{view}_{st.session_state.get('q_nonce', 0)}", height=min(36 * (len(rows) + 1) + 4, 640),
+        key=f"q_table_{view}_{st.session_state.get('q_nonce', 0)}", height=min(35 * (len(rows) + 1) + 3, 640),
         column_config={
             "Severity": st.column_config.TextColumn(width=178, help="P0 critical · P1 high · P2 medium · P3 low. Confirmed = decided by a person · AI-suggested = not yet confirmed · Needs manual triage = the AI failed; rules estimate shown as a placeholder"),
             "ID": st.column_config.TextColumn(width=78),
             "Title": st.column_config.TextColumn(width=210),
-            "Code": st.column_config.TextColumn(width=62, help="Policy code, e.g. CS-01. See Rules & playbooks → Policies."),
-            "Policy": st.column_config.TextColumn(width=200, help="Policy the case may violate. '+N more' = other policies also match this case."),
+            "Policy": st.column_config.TextColumn(width=260, help="Policy code and name. '+N more' = other policies also match this case. See Rules & playbooks → Policies."),
             "Policy status": st.column_config.TextColumn(width=104, help="Confirmed = a person confirmed the policy; AI-suggested = not yet confirmed."),
             "Status": st.column_config.TextColumn(width=118, help="Awaiting triage · In progress · Closed"),
-            "Alerts": st.column_config.TextColumn(width=280, help="Session auto-paused: the system paused the reported conversation, a specialist must confirm or lift · AI failed: no AI recommendation, triage manually · SLA overdue: first review is late · Review required: a person must review before any decision · Test data: fault-injection test"),
+            "Alerts": st.column_config.TextColumn(width=280, help="Assigned to you: someone handed you this case and you haven't acted on it yet · QA required: closed P0/P1 waiting for an independent QA review · Session auto-paused: the system paused the reported conversation, a specialist must confirm or lift · AI failed: no AI recommendation, triage manually · SLA overdue: first review is late · Review required: a person must review before any decision · Test data: fault-injection test"),
             "Stage": st.column_config.TextColumn(width=200, help="Detail within the status: Intake, AI assessment, Triage, Investigation, Containment, Response, Closure, QA review"),
             "Next action": st.column_config.TextColumn(width=280, help="What the case needs next. '(needs …)' = a different role must do it."),
             "First review": st.column_config.TextColumn(width=120, help="SLA: time to the first human review target (prototype assumptions)"),

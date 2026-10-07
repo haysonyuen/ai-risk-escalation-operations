@@ -83,6 +83,10 @@ def close_dialog(iid: str) -> None:
        + f" · signing as <b>{esc(current_actor().display)}</b>")
     with st.form("closure"):
         cat = st.selectbox("Closure category", wf.CLOSURE_CATEGORIES, format_func=pretty)
+        viol = st.radio("Was a policy violation confirmed?", ["yes", "no", "cannot_determine"], index=None, horizontal=True,
+                        format_func={"yes": "Yes, confirmed", "no": "No violation", "cannot_determine": "Can't determine"}.get,
+                        help="False positives and user misunderstandings are 'No violation'; confirmed incidents are 'Yes'. "
+                             "Cleared cases are not counted as violations of the policy.")
         rc = st.text_input("Root cause")
         imp = st.text_input("User / customer impact")
         evr = st.multiselect("Evidence reviewed", [e.evidence_id for e in intake.evidence], default=[e.evidence_id for e in intake.evidence])
@@ -98,7 +102,8 @@ def close_dialog(iid: str) -> None:
         sign = st.text_area("Sign-off statement", placeholder="What you reviewed and why the case can close", height=70)
         if st.form_submit_button("Sign off and close", type="primary"):
             if run_inline(lambda: wf.close_incident(c, iid, {
-                    "closure_category": cat, "final_severity": inc["human_severity"], "root_cause": rc, "user_customer_impact": imp,
+                    "closure_category": cat, "final_severity": inc["human_severity"], "violation_confirmed": viol,
+                    "root_cause": rc, "user_customer_impact": imp,
                     "evidence_reviewed": evr, "teams_involved": teams, "actions_taken": acts, "response_status": resp,
                     "remaining_mitigation": rem, "monitoring_required": mon, "acknowledge_active_containment": ack,
                     "sign_off_statement": sign}, current_actor()), "Case closed with sign-off"):
@@ -467,6 +472,7 @@ def _related(inc) -> None:
 # ============================================================================ right: actions
 
 def _decision_card(inc, intake, a) -> None:
+    c = conn()
     with st.container(border=True):
         st.markdown("**Severity, policy & routing decision**")
         if inc["human_severity"]:
@@ -476,7 +482,7 @@ def _decision_card(inc, intake, a) -> None:
         if inc["status"] in CLOSED:
             st.caption("Reopen the case to change the decision.")
             return
-        hint = permission_hint("decide_severity")
+        hint = permission_hint(wf.decision_permission(c, inc))
         holder = st.expander("Change decision", expanded=False) if inc["human_severity"] else st.container()
         with holder:
             _decision_form(inc, intake, a, hint)
@@ -485,30 +491,41 @@ def _decision_card(inc, intake, a) -> None:
 def _decision_form(inc, intake, a, hint) -> None:
     c = conn()
     iid = inc["incident_id"]
-    ai_sev = a["controlled_severity"] if a else None
-    ai_route = a["controlled_route"] if a else None
-    d_sev = inc["human_severity"] or ai_sev or "P1"
-    d_route = inc["human_route"] or ai_route or "risk_ops"
-    d_teams = json.loads(inc["human_teams_json"] or "null") or (a["rule_result"]["teams"] if a else ["Risk Ops"])
+    ai_valid = bool(a) and a["status"] == "valid"
+    est_sev = a["controlled_severity"] if a else None
+    ai_sev = est_sev if ai_valid else None
+    ai_route = a["controlled_route"] if ai_valid else None
+    d_sev = inc["human_severity"] or est_sev
+    d_route = inc["human_route"] or (a["controlled_route"] if a else "risk_ops")
+    if a and not ai_valid and not inc["human_severity"]:
+        st.caption("The AI assessment failed. Fields are pre-filled from the rules estimate only: check every one.")
+    elif not a and not inc["human_severity"]:
+        st.caption("Not assessed yet: choose severity and policy yourself, or run the AI assessment first.")
+    # Pre-select only the owning team, plus the Incident Lead for P0/P1; more can be added.
+    route_team = {"product_engineering": "Engineering"}.get(d_route, ROUTE_LABEL.get(d_route, ""))
+    d_teams = json.loads(inc["human_teams_json"] or "null") or (
+        [t for t in [route_team] if t in TEAMS] + (["Incident Lead"] if d_sev in ("P0", "P1") else []))
     c1, c2 = st.columns(2)
-    sev = c1.selectbox("Severity", SEVERITIES, index=SEVERITIES.index(d_sev), key=f"d_sev_{iid}", disabled=bool(hint))
+    sev = c1.selectbox("Severity", SEVERITIES, index=SEVERITIES.index(d_sev) if d_sev else None, placeholder="Choose…",
+                       key=f"d_sev_{iid}", disabled=bool(hint))
     route = c2.selectbox("Owning team (route)", ROUTES, index=ROUTES.index(d_route), format_func=ROUTE_LABEL.get,
                          key=f"d_route_{iid}", disabled=bool(hint))
     teams = st.multiselect("Teams involved", TEAMS, default=[t for t in d_teams if t in TEAMS], key=f"d_teams_{iid}", disabled=bool(hint))
     sug = policies.suggested(a)
-    ai_pol = sug[0] if sug else None
-    d_pol = inc["human_policy"] or ai_pol or "benign_noise"
+    ai_pol = sug[0] if (sug and ai_valid) else None
+    d_pol = inc["human_policy"] or (sug[0] if sug else None)  # never default to "No policy issue"
     keys = policies.keys()
-    pol = st.selectbox("Policy violated", keys, index=keys.index(d_pol), format_func=policy_label, key=f"d_pol_{iid}",
+    pol = st.selectbox("Policy violated", keys, index=keys.index(d_pol) if d_pol else None, placeholder="Choose a policy…",
+                       format_func=policy_label, key=f"d_pol_{iid}",
                        disabled=bool(hint), help="Suggested by the AI and rules. See Rules & playbooks → Policies for definitions.")
     d_other = json.loads(inc["human_policies_json"] or "null") if inc["human_policy"] else sug[1:]
     others = st.multiselect("Other policies (optional)", [k for k in keys if k not in (pol, "benign_noise")],
                             default=[k for k in (d_other or []) if k not in (pol, "benign_noise")], format_func=policy_label,
                             key=f"d_pols_{iid}", disabled=bool(hint))
-    need_ev = sev in ("P0", "P1") or ai_sev in ("P0", "P1")
+    need_ev = sev in ("P0", "P1") or est_sev in ("P0", "P1")
     evr = st.multiselect("Source evidence I reviewed" + (" (required)" if need_ev else ""), [e.evidence_id for e in intake.evidence],
                          key=f"d_ev_{iid}", disabled=bool(hint))
-    override = bool(a) and (sev != ai_sev or route != ai_route or (ai_pol is not None and pol != ai_pol))
+    override = ai_valid and (sev != ai_sev or route != ai_route or (ai_pol is not None and pol != ai_pol))
     code = None
     if override:
         md(f"<span class='small'>Differs from the AI recommendation after controls ({ai_sev} → {ROUTE_LABEL[ai_route]}"
@@ -517,7 +534,7 @@ def _decision_form(inc, intake, a, hint) -> None:
         code = st.selectbox("Override reason", list(wf.OVERRIDE_REASONS), format_func=wf.OVERRIDE_REASONS.get, key=f"d_code_{iid}", disabled=bool(hint))
     needs_text = override or (inc["human_severity"] and inc["human_severity"] != sev)
     reason = st.text_area("Rationale" + (" (required)" if needs_text else " (optional)"), height=80, key=f"d_reason_{iid}", disabled=bool(hint))
-    label = "Record override" if override else ("Confirm AI recommendation" if a and not inc["human_severity"] else "Record decision")
+    label = "Record override" if override else ("Confirm AI recommendation" if ai_valid and not inc["human_severity"] else "Record decision")
     if st.button(label, type="primary", disabled=bool(hint), help=hint, key=f"d_btn_{iid}", use_container_width=True):
         run_action(lambda: wf.decide_severity(c, iid, current_actor(), sev, route, teams, reason, code, evr,
                                               policy=pol, other_policies=others),
@@ -619,7 +636,7 @@ def _containment_card(inc, a) -> None:
                       else f"Approved by {esc(actor_name(x['decided_by']))}")
                 exp = f"expires {x['expires_at'][:16].replace('T', ' ')} UTC" if x["expires_at"] else "no automatic expiry"
                 md(f"<b>{action_label(x['action_type'])}</b> on {esc(x['target'])} " + badge("ACTIVE · simulated", "b-p1")
-                   + f"<br><span class='small'>{by} · review {relative((due - now).total_seconds() / 60)} · {exp}</span>")
+                   + f"<br><span class='small'>{by} · next review {relative((due - now).total_seconds() / 60).replace('due in', 'in')} · {exp}</span>")
                 k = x["action_id"]
                 why = st.text_input("Reason", key=f"ce_{k}", placeholder="Reason to reverse", label_visibility="collapsed", disabled=bool(hint_end))
                 if st.button("Reverse containment", key=f"ceb_{k}", disabled=bool(hint_end), help=hint_end, use_container_width=True):
@@ -660,7 +677,7 @@ def _comms_card(inc) -> None:
         md(badge("DRAFTS ONLY — nothing is ever sent", "b-sim-action"))
         for x in comms:
             spec = json.loads(x["specialist_review_json"])
-            l, r = st.columns([3, 1.3], vertical_alignment="center")
+            l, r = st.columns([2.6, 1.7], vertical_alignment="center")
             l.markdown(f"**{communications.COMM_TYPES[x['comm_type']]}** v{x['version']} "
                        + badge(x["status"], "b-human" if x["status"] == "approved" else "b-muted")
                        + "".join(badge(f"{s} {'✓' if s in spec['approvals'] else 'needed'}", "b-human" if s in spec["approvals"] else "b-warn") for s in spec["required"]),
@@ -695,12 +712,18 @@ def _closure_card(inc) -> None:
         elif status in CLOSED:
             cl = json.loads(inc["closure_json"])
             md(f"{badge('Closed', 'b-human')} {sev_badge(cl['final_severity'])} {pretty(cl['closure_category'])}<br>"
-               + (f"<span class='small'>Policy: <b>{esc(policy_label(inc['human_policy']))}</b></span><br>" if inc["human_policy"] else "")
+               + (f"<span class='small'>Policy: <b>{esc(policy_label(inc['human_policy']))}</b> · "
+                  f"{ {'yes': 'violation confirmed', 'no': 'no violation (cleared)', 'cannot_determine': 'violation could not be determined'}.get(cl.get('violation_confirmed'), 'outcome not recorded')}"
+                  "</span><br>" if inc["human_policy"] else "")
                + f"<span class='small'>Root cause: {esc(cl['root_cause'])}<br>Impact: {esc(cl['user_customer_impact'])}<br>"
                f"Remaining: {esc(cl['remaining_mitigation'])} · Monitoring: {'yes' if cl['monitoring_required'] else 'no'}</span>")
             b1, b2 = st.columns(2)
             if status == "CLOSED":
-                with b1.popover("QA review", use_container_width=True, disabled=bool(permission_hint("qa_review"))):
+                qa_hint = permission_hint("qa_review") or ("QA must be done by someone other than the person who closed the case"
+                                                           if wf.closure_signer(c, iid) == current_actor().actor_id else None)
+                if qa_hint:
+                    st.caption(qa_hint)
+                with b1.popover("QA review", use_container_width=True, disabled=bool(qa_hint)):
                     with st.form(f"qa_{iid}"):
                         outcome = st.selectbox("Outcome", wf.QA_OUTCOMES, format_func=pretty)
                         notes = st.text_area("Notes")
@@ -748,8 +771,11 @@ def render() -> None:
     md(f"{sev_badge(sev, BASIS_LABEL[basis])} <span class='muted'>{iid}</span>")
     st.markdown(f"## {esc(inc['title'])}")
     pol, pol_basis, _ = wf.effective_policy(c, inc)
-    chips = [phase_badge(inc["status"]), policy_badge(pol, pol_basis), badge("Owner: " + (actor_name(inc["owner"]) if inc["owner"] else "unassigned")),
-             source_badge(a["provider_kind"] if a else "none")]
+    chips = [phase_badge(inc["status"]), policy_badge(pol, pol_basis)]
+    if row["handoff_to"] == current_actor().actor_id:
+        chips.append(badge("Assigned to you", "b-p3", "Someone handed this case to you and you haven't acted on it yet."))
+    if inc["status"] == "CLOSED" and inc["human_severity"] in ("P0", "P1"):
+        chips.append(badge("QA required", "b-warn", "Closed P0/P1 cases need a QA review by someone other than the person who closed them."))
     if row["auto_paused"]:
         chips.append(badge("Session auto-paused", "b-p0",
                            "The reported conversation was paused automatically because the case is rated P0 in CBRN or child safety. "
@@ -770,9 +796,12 @@ def render() -> None:
         chips.append(badge("Review required", "b-warn",
                            "A person must review the source evidence before any decision; the AI cannot clear this case. "
                            "See 'Why a person must review this' under AI analysis."))
+    chips.append(badge("Owner: " + (actor_name(inc["owner"]) if inc["owner"] else "unassigned")))
+    meta = [source_badge(a["provider_kind"] if a else "none")]
     if inc["origin"] == "seed":
-        chips.append(badge("Synthetic demo data", "b-muted", "A made-up case seeded for the demo. No real people or systems are involved."))
+        meta.append(badge("Synthetic demo data", "b-muted", "A made-up case seeded for the demo. No real people or systems are involved."))
     md(" ".join(chips))
+    md(f'<div style="opacity:.75;margin-top:2px;transform:scale(.95);transform-origin:left">{" ".join(meta)}</div>')
     md(stepper(inc["status"]))
 
     me = current_actor()

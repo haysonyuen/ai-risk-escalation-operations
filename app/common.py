@@ -32,7 +32,7 @@ from riskops.schemas import TEAMS as SCHEMA_TEAMS  # noqa: E402
 STATUS_LABEL = {
     "NEW": "Intake · not yet assessed", "ASSESSED": "AI assessed · awaiting triage",
     "ASSESSMENT_FAILED": "AI assessment failed · manual triage", "TRIAGED": "Triaged", "INVESTIGATING": "Investigating",
-    "CONTAINMENT": "Containment", "RESPONSE": "Response", "CLOSED": "Closed · QA pending",
+    "CONTAINMENT": "Containment", "RESPONSE": "Response", "CLOSED": "Closed",
     "REOPENED": "Reopened · re-triage", "QA_REVIEWED": "Closed · QA reviewed",
 }
 STAGES = ["Intake", "AI assessment", "Triage", "Investigation", "Containment", "Response", "Closure", "QA review"]
@@ -48,7 +48,7 @@ PHASE_HELP = {"Awaiting triage": "No human severity decision yet.",
 PHASE_BADGE = {"Awaiting triage": "b-warn", "In progress": "b-p3", "Closed": "b-human"}
 STAGE_NEXT = {"NEW": "AI assessment", "ASSESSED": "Triage", "ASSESSMENT_FAILED": "Triage (manual)", "REOPENED": "Triage",
               "TRIAGED": "Investigation", "INVESTIGATING": "Containment or Response", "CONTAINMENT": "Response",
-              "RESPONSE": "Closure", "CLOSED": "QA review", "QA_REVIEWED": None}
+              "RESPONSE": "Closure", "CLOSED": "QA review (required for P0/P1, sampled otherwise)", "QA_REVIEWED": None}
 
 
 def phase(status: str) -> str:
@@ -152,14 +152,16 @@ def ver(v: str | None) -> str:
 
 SEVERITY_BASIS_WORD = {"human": "Confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "Needs manual triage",
                        "unassessed_default": "Not assessed"}
-POLICY_STATUS_WORD = {"human": "Confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "Not confirmed",
+POLICY_STATUS_WORD = {"cleared": "Cleared · no violation", "human": "Confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "Not confirmed",
                       "unassessed_default": "—"}
 
 
-def alerts(x: dict) -> list[str]:
+def alerts(x: dict, me: str | None = None) -> list[str]:
     """Plain-word alerts for a queue row (replaces the ⏸️ ⚠️ ⚑ 🧪 symbols)."""
     is_open = x["status"] not in ("CLOSED", "QA_REVIEWED")
     out = []
+    if me and x.get("handoff_to") == me and is_open:
+        out.append("Assigned to you")
     if x["auto_paused"]:
         out.append("Session auto-paused")
     if x["overdue"] and is_open:
@@ -168,6 +170,8 @@ def alerts(x: dict) -> list[str]:
         out.append("Review required")
     if x["ai_status"] == "failed" and is_open and not x["human_severity"]:
         out.append("AI failed")
+    if x["status"] == "CLOSED" and x["human_severity"] in ("P0", "P1"):
+        out.append("QA required")
     if x["ai_source"] == "fault_injection":
         out.append("Test data")
     return out
@@ -178,7 +182,7 @@ def policy_with_more(x: dict) -> str:
     return policies.label(x["policy"], code=False) + (f" (+{n} more)" if n else "") if x["policy"] else "Not assessed"
 
 
-POLICY_BASIS = {"human": "✓ confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "not confirmed · AI failed",
+POLICY_BASIS = {"cleared": "cleared · no violation", "human": "✓ confirmed", "ai_after_controls": "AI-suggested", "rules_after_ai_failure": "not confirmed · AI failed",
                 "unassessed_default": "not assessed"}
 
 
@@ -188,9 +192,11 @@ def policy_label(key: str | None, code: bool = True) -> str:
 
 def policy_badge(key: str | None, basis: str, prefix: str = "Policy: ") -> str:
     p = policies.get(key)
-    cls = "b-human" if basis == "human" else "b-fixture"
+    cls = {"human": "b-human", "cleared": "b-muted"}.get(basis, "b-fixture")
     tip = (f"{p['code']} · {p['name']}: {p['definition']} "
-           + ("A person confirmed this policy." if basis == "human" else "Suggested by the AI and rules; a person confirms it in the decision.")) if p else None
+           + {"human": "A person confirmed this policy.",
+              "cleared": "Investigated under this policy and closed with no violation found."}.get(
+               basis, "Suggested by the AI and rules; a person confirms it in the decision.")) if p else None
     return badge(prefix + policy_label(key) + (" · " + POLICY_BASIS.get(basis, basis) if key else ""), cls, tip)
 
 
@@ -604,8 +610,10 @@ def describe_event(e: dict) -> str:
     if t in ("ai_assessment", "ai_reassessment"):
         what = "re-ran" if t == "ai_reassessment" else "ran"
         res = details.get("status")
-        return (f"{who} {what} the AI assessment ({pretty(details.get('provider_kind'))}, rules {details.get('rule_version')}): "
-                + (f"recommends {details.get('controlled_severity')} after controls" if res == "valid" else f"<b>failed</b> ({details.get('error_kind')})"))
+        return (f"{who} {what} the AI assessment ({SOURCE_LABEL.get(details.get('provider_kind'), (pretty(details.get('provider_kind')),))[0]}, "
+                f"Rules {ver(details.get('rule_version'))}): "
+                + (f"recommends {details.get('controlled_severity')} after safety checks" if res == "valid"
+                   else f"<b>failed</b> ({pretty(details.get('error_kind'))}); case routed to manual triage"))
     if t == "human_severity_confirmed":
         return f"{who} confirmed severity <b>{nv['severity']}</b> → {ROUTE_LABEL.get(nv['route'], nv['route'])}{reason}"
     if t == "human_override":
