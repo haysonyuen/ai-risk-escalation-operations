@@ -31,7 +31,7 @@ def _bar(counts: pd.DataFrame, field: str, order: list[str], height: int, horizo
                                     legend=alt.Legend(orient="top", title=None)),
                     order=alt.Order("Severity:N", sort="ascending"),
                     tooltip=[field, "Severity", "Tickets"])
-            .properties(height=height))
+            .properties(height=alt.Step(30) if horizontal else height))
 
 
 def _open_table(table: pd.DataFrame, key: str, height: int) -> None:
@@ -130,7 +130,7 @@ def _workload(q: list[dict]) -> None:
             st.markdown("**By policy**")
             by_pol = df.groupby(["Policy", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
             order = df["Policy"].value_counts().index.tolist()
-            st.altair_chart(_bar(by_pol, "Policy", order, 40 + 26 * len(order), horizontal=True), use_container_width=True)
+            st.altair_chart(_bar(by_pol, "Policy", order, 0, horizontal=True), use_container_width=True)
         with st.expander("Breakdown by stage"):
             by_stage = df.groupby(["Stage", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
             st.altair_chart(_bar(by_stage, "Stage", [s for s in STAGES if s in set(df["Stage"])], 240), use_container_width=True)
