@@ -18,7 +18,7 @@ from .providers import FaultInjectionProvider, OfflineProvider
 from .schemas import IncidentIntake
 
 # Bump when seeded data or the schema changes incompatibly; older local databases are rebuilt.
-DEMO_DATA_VERSION = "demo-v3-policies-2"
+DEMO_DATA_VERSION = "demo-v4-operator-review"
 A = {a.actor_id: a for a in wf.SIMULATED_ACTORS}
 SYS = wf.SYSTEM_ACTOR
 S = "seed"
@@ -156,7 +156,7 @@ def seed(path: str | None = None, now: datetime | None = None) -> Path:
         wf.transition(conn, "INC-1012", "RESPONSE", A["alex.riskops"], origin=S)
     with at("INC-1012", 5000):
         wf.close_incident(conn, "INC-1012", {
-            "closure_category": "model_behavior_issue", "final_severity": "P2",
+            "closure_category": "model_behavior_issue", "final_severity": "P2", "violation_confirmed": "yes",
             "root_cause": "Ranking prompt template let name-based signals influence scores.",
             "user_customer_impact": "Unfair candidate rankings for one enterprise customer over two weeks.",
             "evidence_reviewed": ["E1", "E2"], "teams_involved": ["Model Behavior", "Legal/Privacy", "Enterprise/CS"],
@@ -180,7 +180,7 @@ def seed(path: str | None = None, now: datetime | None = None) -> Path:
         wf.transition(conn, "INC-1014", "RESPONSE", A["alex.riskops"], origin=S)
     with at("INC-1014", 400):
         wf.close_incident(conn, "INC-1014", {
-            "closure_category": "classifier_false_positive", "final_severity": "P3",
+            "closure_category": "classifier_false_positive", "final_severity": "P3", "violation_confirmed": "no",
             "root_cause": "Classifier over-triggers on school chemistry vocabulary.", "user_customer_impact": "None.",
             "evidence_reviewed": ["E1", "E2"], "teams_involved": ["Safety"], "actions_taken": "Added to the classifier false-positive set.",
             "response_status": "No user contact needed.", "remaining_mitigation": "None.",

@@ -74,7 +74,10 @@ TRIAGE_ROLES = {"risk_ops_analyst", "incident_lead"}
 PERMISSIONS: dict[str, set[str]] = {
     "create_incident": HUMAN_ROLES,
     "run_assessment": TRIAGE_ROLES | {"system"},
-    "decide_severity": TRIAGE_ROLES,
+    "decide_severity": TRIAGE_ROLES | {"safety_specialist"},
+    # Display-only keys for "who can decide this case" (decide_severity enforces the same rules):
+    "decide_standard": TRIAGE_ROLES,                                # non-severe policy areas
+    "decide_severe_p0": {"incident_lead", "safety_specialist"},     # P0 in a severe-harm policy area
     "assign_owner": TRIAGE_ROLES,
     "transition": TRIAGE_ROLES,
     "add_note": HUMAN_ROLES,
@@ -200,7 +203,8 @@ def effective_severity(conn, inc: dict) -> tuple[str, str]:
 def effective_policy(conn, inc: dict) -> tuple[str | None, str, list[str]]:
     """(primary policy, basis, other policies). A person's decision wins; otherwise the AI/rules suggestion."""
     if inc["human_policy"]:
-        return inc["human_policy"], "human", json.loads(inc["human_policies_json"] or "[]")
+        basis = "cleared" if inc["human_violation"] == "no" else "human"
+        return inc["human_policy"], basis, json.loads(inc["human_policies_json"] or "[]")
     a = get_assessment(conn, inc["current_assessment_id"])
     s = policies.suggested(a)
     if not s:
@@ -281,7 +285,7 @@ def add_evidence(conn, incident_id: str, evidence: Evidence, actor: Actor, origi
         _check_transition(inc["status"], "REOPENED", "reopen")
         _set_status(conn, incident_id, inc["status"], "REOPENED", actor,
                     f"New evidence {evidence.evidence_id} arrived after closure; human re-triage required", origin)
-        conn.execute("UPDATE incidents SET closed_at=NULL WHERE incident_id=?", (incident_id,))
+        conn.execute("UPDATE incidents SET closed_at=NULL, human_violation=NULL WHERE incident_id=?", (incident_id,))
     conn.commit()
 
 
@@ -359,6 +363,11 @@ def run_assessment(conn, incident_id: str, provider, actor: Actor = SYSTEM_ACTOR
 # Human severity decision
 # ---------------------------------------------------------------------------------------
 
+SEVERE_POLICIES = {"child_safety", "cbrn", "self_harm", "violent_extremism", "deepfake_ncii"}
+NO_VIOLATION_CATEGORIES = {"classifier_false_positive", "user_misunderstanding_no_defect"}
+CONFIRMED_VIOLATION_CATEGORIES = {"confirmed_safety_incident", "confirmed_misuse_actor", "coordinated_abuse",
+                                  "privacy_sensitive_data_incident"}
+
 OVERRIDE_REASONS = {
     "evidence_contradicts_ai": "Source evidence contradicts the AI summary",
     "missing_context": "AI lacked context the reviewer has (customer, history, telemetry)",
@@ -379,30 +388,42 @@ def decide_severity(conn, incident_id: str, actor: Actor, severity: str, route: 
     primary policy; choosing a different one is an override and needs a reason like any other."""
     require(actor, "decide_severity")
     if severity not in SEVERITIES:
-        raise WorkflowError("Invalid severity")
+        raise WorkflowError("Choose a severity (P0–P3)")
     inc = get_incident(conn, incident_id)
     if inc["status"] in ("CLOSED", "QA_REVIEWED"):
         raise WorkflowError("Reopen the incident before changing severity")
     a = get_assessment(conn, inc["current_assessment_id"])
-    ai_sev = a["controlled_severity"] if a else None
-    ai_route = a["controlled_route"] if a else None
+    ai_valid = bool(a) and a["status"] == "valid"
+    # A failed assessment has no AI recommendation: the rules' estimate is only a placeholder, so a decision
+    # on it is manual triage, never an "override of the AI".
+    est_sev = a["controlled_severity"] if a else None
+    ai_sev = est_sev if ai_valid else None
+    ai_route = a["controlled_route"] if ai_valid else None
     ai_policies = policies.suggested(a)
-    ai_policy = ai_policies[0] if ai_policies else None
-    policy = policy or inc["human_policy"] or ai_policy
-    if policy is not None and policies.get(policy) is None:
+    ai_policy = ai_policies[0] if (ai_policies and ai_valid) else None
+    policy = policy or inc["human_policy"] or (ai_policies[0] if ai_policies else None)
+    if policy is None:
+        raise WorkflowError("Choose the policy the case may violate (or NP-00 · No policy issue)")
+    if policies.get(policy) is None:
         raise WorkflowError("Unknown policy")
+    if actor.role == "safety_specialist" and policy not in SEVERE_POLICIES:
+        raise PermissionDenied("Safety specialists decide severe-harm cases (child safety, CBRN, self-harm, violent extremism, "
+                               "NCII); this case belongs to Risk Ops or the Incident Lead")
+    if severity == "P0" and policy in SEVERE_POLICIES and actor.role == "risk_ops_analyst":
+        raise PermissionDenied(f"A P0 decision under {policies.label(policy)} needs the Safety & Child Safety Specialist "
+                               "or the Incident Lead")
     if other_policies is None:
         other_policies = [p for p in ai_policies if p != policy]
     other_policies = [p for p in dict.fromkeys(other_policies) if p not in (policy, "benign_noise")]
     if any(policies.get(p) is None for p in other_policies):
         raise WorkflowError("Unknown policy")
-    is_override = bool(a) and (severity != ai_sev or route != ai_route or (ai_policy is not None and policy != ai_policy))
+    is_override = ai_valid and (severity != ai_sev or route != ai_route or (ai_policy is not None and policy != ai_policy))
     evidence_reviewed = evidence_reviewed or []
     valid_ids = {e["evidence_id"] for e in rows(conn, "SELECT evidence_id FROM evidence WHERE incident_id=?", (incident_id,))}
     bad = [e for e in evidence_reviewed if e not in valid_ids]
     if bad:
         raise WorkflowError(f"Unknown evidence IDs: {bad}")
-    high = severity in ("P0", "P1") or (ai_sev in ("P0", "P1"))
+    high = severity in ("P0", "P1") or (est_sev in ("P0", "P1"))
     if high and not evidence_reviewed:
         raise WorkflowError("P0/P1 decisions (and any decision on a case the AI rated P0/P1) require listing the source evidence reviewed")
     if is_override:
@@ -410,7 +431,7 @@ def decide_severity(conn, incident_id: str, actor: Actor, severity: str, route: 
             raise WorkflowError("An override of the AI recommendation requires a reason code")
         if len(reason.strip()) < 10:
             raise WorkflowError("An override requires a written rationale (at least 10 characters)")
-    if ai_sev and is_downgrade(ai_sev, severity) and ai_sev in ("P0", "P1") and len(reason.strip()) < 20:
+    if est_sev and is_downgrade(est_sev, severity) and est_sev in ("P0", "P1") and len(reason.strip()) < 20:
         raise WorkflowError("Downgrading from an AI P0/P1 recommendation requires a rationale of at least 20 characters")
     if inc["human_severity"] and inc["human_severity"] != severity and len(reason.strip()) < 10:
         raise WorkflowError("Changing an existing human severity decision requires a rationale")
@@ -428,6 +449,9 @@ def decide_severity(conn, incident_id: str, actor: Actor, severity: str, route: 
               reason=reason.strip() or None, origin=origin, ts=ts,
               details={"ai_recommendation": {"severity": ai_sev, "route": ai_route, "policy": ai_policy,
                                              "assessment_id": a["assessment_id"] if a else None},
+                       "manual_triage": bool(a) and not ai_valid,
+                       "rules_estimate": ({"severity": est_sev, "route": a["controlled_route"],
+                                           "policy": ai_policies[0] if ai_policies else None} if a and not ai_valid else None),
                        "override_reason_code": override_reason_code if is_override else None,
                        "evidence_reviewed": evidence_reviewed})
     if inc["status"] in ("NEW", "ASSESSED", "ASSESSMENT_FAILED", "REOPENED"):
@@ -630,6 +654,7 @@ class ClosureRecord(BaseModel):
         "security_vulnerability", "prompt_injection", "model_behavior_issue", "product_defect", "ux_approval_issue",
         "classifier_false_positive", "user_misunderstanding_no_defect", "insufficient_evidence", "duplicate_known_issue"]
     final_severity: Literal["P0", "P1", "P2", "P3"]
+    violation_confirmed: Literal["yes", "no", "cannot_determine"]
     root_cause: str = Field(min_length=5)
     user_customer_impact: str = Field(min_length=5)
     evidence_reviewed: list[str] = Field(min_length=1)
@@ -659,6 +684,10 @@ def close_incident(conn, incident_id: str, closure: ClosureRecord | dict, actor:
     bad = [e for e in closure.evidence_reviewed if e not in valid_ids]
     if bad:
         raise WorkflowError(f"Unknown evidence IDs in closure: {bad}")
+    if closure.closure_category in NO_VIOLATION_CATEGORIES and closure.violation_confirmed == "yes":
+        raise WorkflowError(f"A '{closure.closure_category.replace('_', ' ')}' closure cannot confirm a policy violation")
+    if closure.closure_category in CONFIRMED_VIOLATION_CATEGORIES and closure.violation_confirmed != "yes":
+        raise WorkflowError(f"A '{closure.closure_category.replace('_', ' ')}' closure means the violation was confirmed")
     pending = rows(conn, "SELECT action_id FROM containment_actions WHERE incident_id=? AND status='proposed'", (incident_id,))
     if pending:
         raise WorkflowError(f"Decide pending containment proposals before closure: {[p['action_id'] for p in pending]}")
@@ -670,8 +699,8 @@ def close_incident(conn, incident_id: str, closure: ClosureRecord | dict, actor:
         if spec["required"] and c["status"] == "draft":
             raise WorkflowError(f"Communication {c['comm_id']} ({c['comm_type']}) awaits required specialist review")
     ts = now_iso()
-    conn.execute("UPDATE incidents SET closure_json=?, closed_at=? WHERE incident_id=?",
-                 (closure.model_dump_json(), ts, incident_id))
+    conn.execute("UPDATE incidents SET closure_json=?, closed_at=?, human_violation=? WHERE incident_id=?",
+                 (closure.model_dump_json(), ts, closure.violation_confirmed, incident_id))
     log_event(conn, incident_id=incident_id, actor_id=actor.actor_id, actor_role=actor.role, event_type="closure_signed_off",
               new=closure.model_dump(mode="json"), reason=closure.sign_off_statement, origin=origin, ts=ts)
     _set_status(conn, incident_id, inc["status"], "CLOSED", actor, "Human-approved closure", origin)
@@ -698,6 +727,9 @@ def qa_review(conn, incident_id: str, actor: Actor, outcome: str, notes: str, or
         raise WorkflowError("Unknown QA outcome")
     inc = get_incident(conn, incident_id)
     _check_transition(inc["status"], "QA_REVIEWED", "qa_review")
+    signer = closure_signer(conn, incident_id)
+    if signer and signer == actor.actor_id:
+        raise PermissionDenied("QA review must be done by someone other than the person who signed off the closure")
     log_event(conn, incident_id=incident_id, actor_id=actor.actor_id, actor_role=actor.role, event_type="qa_review",
               new=outcome, reason=notes, origin=origin)
     _set_status(conn, incident_id, inc["status"], "QA_REVIEWED", actor, f"QA: {outcome}", origin)
@@ -931,8 +963,9 @@ def next_actions(conn, incident_id: str) -> list[dict]:
     st = inc["status"]
     out: list[dict] = []
 
-    def add(title, detail, permission, urgent=False, role=None):
-        out.append({"title": title, "detail": detail, "permission": permission, "role": role, "urgent": urgent})
+    def add(title, detail, permission, urgent=False, role=None, exclude=None):
+        out.append({"title": title, "detail": detail, "permission": permission, "role": role, "urgent": urgent,
+                    "exclude": exclude})
 
     now = utcnow().isoformat(timespec="seconds")
     for h in pending_auto_holds(conn, incident_id):
@@ -947,7 +980,7 @@ def next_actions(conn, incident_id: str) -> list[dict]:
             detail = "The AI assessment failed. Triage manually from the evidence."
         elif st == "REOPENED":
             detail = "New evidence reopened this case. Re-triage it."
-        add("Decide severity and routing", detail, "decide_severity", urgent=True)
+        add("Decide severity and routing", detail, decision_permission(conn, inc), urgent=True)
     for p in rows(conn, "SELECT * FROM containment_actions WHERE incident_id=? AND status='proposed'", (incident_id,)):
         add("Decide on proposed containment", f"{p['action_type'].replace('_', ' ')} on {p['target']}",
             containment_permission(conn, inc), urgent=True)
@@ -973,11 +1006,18 @@ def next_actions(conn, incident_id: str) -> list[dict]:
         add("Close the case with sign-off", "Blocked: " + "; ".join(blockers) if blockers else "Ready to close.",
             closure_permission(inc))
     elif st == "CLOSED":
-        add("Quality review (sampling)", "Optional: check the handling for missed escalation.", "qa_review")
+        if inc["human_severity"] in ("P0", "P1"):
+            add("Quality review (required for P0/P1)", "A second person checks the handling before the case is final.", "qa_review",
+                exclude=closure_signer(conn, incident_id))
+        else:
+            add("Quality review (optional sampling)", "P2/P3 cases are sampled for QA.", "qa_review",
+                exclude=closure_signer(conn, incident_id))
     return out
 
 
 def actor_can_do(conn, actor: Actor, action: dict) -> bool:
+    if action.get("exclude") and action["exclude"] == actor.actor_id:
+        return False
     if action["role"]:
         return actor.role == action["role"]
     return can(actor, action["permission"])
@@ -986,4 +1026,19 @@ def actor_can_do(conn, actor: Actor, action: dict) -> bool:
 def who_can_do(action: dict) -> str:
     if action["role"]:
         return ROLE_LABELS[action["role"]]
-    return roles_for(action["permission"])
+    out = roles_for(action["permission"])
+    return out + (" other than the closer" if action.get("exclude") else "")
+
+
+def decision_permission(conn, inc: dict) -> str:
+    """Which roles may decide this case now (display; decide_severity enforces the same rules)."""
+    pol = effective_policy(conn, inc)[0]
+    if pol not in SEVERE_POLICIES:
+        return "decide_standard"
+    return "decide_severe_p0" if effective_severity(conn, inc)[0] == "P0" else "decide_severity"
+
+
+def closure_signer(conn, incident_id: str) -> str | None:
+    ev = rows(conn, "SELECT actor_id FROM events WHERE incident_id=? AND event_type='closure_signed_off' ORDER BY event_id DESC LIMIT 1",
+              (incident_id,))
+    return ev[0]["actor_id"] if ev else None

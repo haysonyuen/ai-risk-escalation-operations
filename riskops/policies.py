@@ -75,16 +75,13 @@ def why_matched(assessment: dict | None, key: str) -> list[str]:
         cat_rules = [r for r in load_rules(rr["rule_version"])["category_rules"] if r["category"] == key]
     except Exception:  # archived rule version
         cat_rules = []
-    sig, terms = rr.get("signals", {}), rr.get("matched_terms", {})
+    sig = rr.get("signals", {})
     for r in cat_rules:
         for cond in r.get("all", []) + r.get("any", []):
             name = cond.lstrip("!")
             if cond.startswith("!") or not sig.get(name):
                 continue
-            t = terms.get(name) or []
-            line = f"Rules signal: {name.replace('_', ' ')}"
-            if t:
-                line += " (matched: " + ", ".join(dict.fromkeys(str(x) for x in t[:3])) + ")"
+            line = f"Rules signal: {name.replace('_', ' ')}"  # raw matched terms stay in "How this was produced"
             if line not in out:
                 out.append(line)
     if key in rr.get("categories", []) and not out:

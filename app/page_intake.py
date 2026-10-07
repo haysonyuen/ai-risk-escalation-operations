@@ -13,6 +13,18 @@ from riskops.schemas import IncidentIntake
 TRI = ["unknown", "yes", "no"]
 
 
+
+EV_LABEL = {k: k.replace("_", " ").capitalize() for k in EVIDENCE_TYPES}
+EV_KEY = {v: k for k, v in EV_LABEL.items()}
+
+
+def _next_id() -> str:
+    """Next sequential INC-#### number (IDs are quoted in tickets and chats, so they should not look like other cases)."""
+    import re
+    nums = [int(m.group(1)) for r in rows(conn(), "SELECT incident_id FROM incidents")
+            if (m := re.fullmatch(r"INC-(\d{4,6})", r["incident_id"]))]
+    return f"INC-{max(nums, default=1000) + 1}"
+
 def _after_create(iid: str, assess: bool) -> None:
     c = conn()
     target = wf.get_intake(c, iid)
@@ -95,24 +107,24 @@ def render() -> None:
             st.caption("One row per record. IDs must be unique and are permanent. Rows with empty content are skipped. "
                        "Evidence is optional, but without it the case is rated on the report alone.")
             ev_df = st.data_editor(
-                pd.DataFrame([{"ID": "E1", "Type": "reporter_statement", "Source": "Reporter statement", "Content": ""}]),
+                pd.DataFrame([{"ID": "E1", "Type": EV_LABEL["reporter_statement"], "Source": "Reporter statement", "Content": ""}]),
                 num_rows="dynamic", use_container_width=True, hide_index=True,
                 column_config={"ID": st.column_config.TextColumn(width="small", required=True),
-                               "Type": st.column_config.SelectboxColumn(options=EVIDENCE_TYPES, required=True),
+                               "Type": st.column_config.SelectboxColumn(options=list(EV_LABEL.values()), required=True),
                                "Source": st.column_config.TextColumn(width="medium"),
                                "Content": st.column_config.TextColumn(width="large")})
 
             o1, o2, o3 = st.columns([2, 2, 1])
             owners = ["(unassigned)"] + [x.actor_id for x in wf.SIMULATED_ACTORS]
             owner = o1.selectbox("Owner", owners)
-            iid = o2.text_input("Incident ID", value=f"INC-{datetime.now(timezone.utc).strftime('%m%d%H%M%S')}")
+            iid = o2.text_input("Incident ID", value=_next_id(), help="Next free number. Keep it unless you are importing an existing ticket.")
             assess = o3.checkbox("Run AI assessment", value=True)
             if st.form_submit_button("Create report", type="primary", disabled=bool(hint)):
                 problems = _check_form(title, behavior, iid, ev_df)
                 if problems:
                     st.error("Please fix the following before creating the report:\n" + "\n".join(f"- {x}" for x in problems))
                     return
-                evidence = [{"evidence_id": str(r["ID"]).strip(), "source_type": r["Type"], "source_description": (r["Source"] or "unspecified"),
+                evidence = [{"evidence_id": str(r["ID"]).strip(), "source_type": EV_KEY.get(r["Type"], r["Type"]), "source_description": (r["Source"] or "unspecified"),
                              "content": r["Content"]} for _, r in ev_df.iterrows() if str(r.get("Content") or "").strip()]
                 data = {"incident_id": iid, "reported_at": datetime.now(timezone.utc).isoformat(), "title": title,
                         "product_surface": surface or "unknown", "customer_type": customer, "reporter_channel": channel,

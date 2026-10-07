@@ -9,7 +9,11 @@ Findings are grouped by impact:
 - **Medium:** slows the operator down or causes confusion.
 - **Low:** polish.
 
-**Status:** each finding is documented with a suggested change. None are implemented yet.
+**Status: all 18 findings are fixed** (high, medium and low). For H4, the rule adopted is:
+- **Severe-harm areas:** the Safety & Child Safety Specialist may decide severity and policy in severe-harm policy areas (CS, WP, SH, VE, NC), but not in other areas.
+- **P0 in those areas:** needs the Specialist or the Incident Lead. A Risk Ops analyst can't confirm it alone.
+
+Each finding below is kept as written; the fix is summarised in the section at the end.
 
 ---
 
@@ -157,3 +161,39 @@ Findings are grouped by impact:
 4. **M5 to M8, then L1 to L5.**
 
 No real-world claims are made here. These observations come from synthetic demo data and simulated roles.
+
+---
+
+## What was changed
+
+**High**
+- **H1, required choices:** with no suggestion, severity and policy start empty ("Choose…"). The service refuses a decision without a policy, and nothing defaults to NP-00.
+- **H2, AI failure is manual triage:** when the AI failed, the button reads "Record decision" and a note says the fields come from the rules estimate.
+  - The decision is logged as **manual triage**, with the rules estimate kept separately.
+  - It is not counted as an AI override. The dashboard shows the manual-triage count next to overrides.
+- **H3, violation outcome at closure:** closure asks **"Was a policy violation confirmed?"** (Yes / No / Can't determine), and the answer is checked against the closure category.
+  - A *classifier false positive* cannot be "Yes", and a confirmed incident must be "Yes".
+  - Cleared cases show **"cleared · no violation"** and are left out of the *By policy* chart, which now counts confirmed or suspected violations only.
+- **H4, specialist decisions:** the rule above is enforced in the service and reflected in the Next panel and the decision form.
+- **H5, independent QA:** QA by the person who signed off the closure is refused, the QA button is disabled for them, and the reason is shown.
+
+**Medium**
+- **M1, queue columns:** Severity · ID · Title · Alerts · Next action · First review · Owner come first. Policy code and name are merged into one column.
+- **M2, case counts:** "Cases I can act on" counts cases, with the number of steps in the hover text.
+- **M3, plain text:**
+  - The activity feed reads e.g. "Demo AI (…), Rules v2.0".
+  - "Why it matched" no longer prints raw matched terms.
+  - The demo AI summary names policies.
+  - New report shows readable evidence types.
+- **M4, QA rule:** QA is required for P0/P1 and sampled for P2/P3. The Next panel, the stage line and a "QA required" alert all say so, and closed cases are labelled just "Closed".
+- **M5, fewer pre-selected teams:** only the owning team is pre-selected, plus the Incident Lead for P0/P1.
+- **M6, policy chart:** shows violations only, with a "Not shown" line for no policy issue, cleared and not assessed.
+- **M7, incident IDs:** new reports get the next sequential ID (e.g. INC-1017).
+- **M8, handoff:** an "Assigned to you" alert and header chip appear until the new owner acts on the case, and the queue has an "Assigned to me" count.
+
+**Low**
+- **L1:** the queue table is sized to its rows.
+- **L2:** the "Open draft" button has room.
+- **L3:** confirmed pauses say "next review in …".
+- **L4:** the case header shows status, policy and alerts first, with AI source and demo-data on a quieter second line.
+- **L5:** the lifted-pause rate shows "n of N" below five reviews.

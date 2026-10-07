@@ -120,17 +120,27 @@ def _workload(q: list[dict]) -> None:
             st.info("No cases match these filters.")
             return
         df = pd.DataFrame([{"Status": phase(x["status"]), "Stage": stage(x["status"]), "Severity": x["effective_severity"],
-                            "Policy": policy_label(x["policy"]) if x["policy"] else "Not assessed"} for x in items])
+                            "Policy": policy_label(x["policy"]) if x["policy"] else "Not assessed",
+                            "Counted": bool(x["policy"]) and x["policy"] != "benign_noise" and x["policy_basis"] != "cleared"}
+                           for x in items])
         c1, c2 = st.columns(2, gap="large")
         with c1:
             st.markdown("**By status**")
             by_phase = df.groupby(["Status", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
             st.altair_chart(_bar(by_phase, "Status", [p for p in PHASES if p in picked], 250), use_container_width=True)
         with c2:
-            st.markdown("**By policy**")
-            by_pol = df.groupby(["Policy", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
-            order = df["Policy"].value_counts().index.tolist()
-            st.altair_chart(_bar(by_pol, "Policy", order, 0, horizontal=True), use_container_width=True)
+            st.markdown("**By policy** (confirmed or suspected violations)")
+            pdf = df[df["Counted"]]
+            if pdf.empty:
+                st.caption("No cases with a suspected or confirmed violation in this selection.")
+            else:
+                by_pol = pdf.groupby(["Policy", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
+                order = pdf["Policy"].value_counts().index.tolist()
+                st.altair_chart(_bar(by_pol, "Policy", order, 0, horizontal=True), use_container_width=True)
+            n_none = sum(1 for x in items if x["policy"] == "benign_noise")
+            n_clear = sum(1 for x in items if x["policy_basis"] == "cleared")
+            n_na = sum(1 for x in items if not x["policy"])
+            st.caption(f"Not shown: no policy issue · {n_none} · cleared (no violation) · {n_clear} · not assessed · {n_na}")
         with st.expander("Breakdown by stage"):
             by_stage = df.groupby(["Stage", "Severity"], as_index=False).size().rename(columns={"size": "Tickets"})
             st.altair_chart(_bar(by_stage, "Stage", [s for s in STAGES if s in set(df["Stage"])], 240), use_container_width=True)
@@ -161,7 +171,8 @@ def _human(m: dict) -> None:
                       help="Decisions where the confirmed policy differs from the AI/rules suggestion")
             st.dataframe(pd.DataFrame([{"Override reason": wf.OVERRIDE_REASONS.get(k, pretty(k)), "Count": v} for k, v in o["by_reason"].items()]
                                       or [{"Override reason": "none yet", "Count": 0}]), hide_index=True, use_container_width=True)
-            st.caption("Direction: " + (" · ".join(f"{OVERRIDE_DIRECTION.get(k, pretty(k))}: {v}" for k, v in o["by_direction"].items()) or "—"))
+            st.caption("Direction: " + (" · ".join(f"{OVERRIDE_DIRECTION.get(k, pretty(k))}: {v}" for k, v in o["by_direction"].items()) or "—")
+                       + f" · Manual triage after an AI failure (not counted as overrides): {o['manual_triage']}")
         with b:
             h = m["auto_hold"]
             st.markdown("**Automatic session pauses** (simulated)")
@@ -172,7 +183,8 @@ def _human(m: dict) -> None:
             k3, k4 = st.columns(2)
             k3.metric("Confirmed / lifted", f"{h['confirmed']} / {h['lifted']}")
             ls = h["lifted_share_of_reviewed"]
-            k4.metric("Lifted (false alarms)", f"{ls['value']:.0%}" if ls["value"] is not None else "—",
+            k4.metric("Lifted (false alarms)",
+                      (f"{ls['numerator']} of {ls['denominator']}" if ls["denominator"] < 5 else f"{ls['value']:.0%}") if ls["denominator"] else "—",
                       help=f"{ls['numerator']} of {ls['denominator']} reviewed pauses were lifted. {h['note']}")
             st.caption(f"P0 CBRN and child-safety cases pause the reported session automatically; a person must confirm or lift it "
                        f"within {duration(config.sla_config()['auto_hold_review_minutes'])}.")

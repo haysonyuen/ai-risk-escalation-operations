@@ -16,6 +16,7 @@ import hashlib
 import json
 import time
 
+from .. import policies
 from ..config import FIXTURE_DIR
 from ..rules import RuleResult
 from ..schemas import IncidentIntake
@@ -52,8 +53,8 @@ class OfflineSimulationProvider:
             ids = [e.evidence_id for e in incident.evidence if e.source_type != "reporter_statement"]
             contradictions.append({"description": "Evidence text indicates records that do not match the report (lexicon match, needs human reading).", "evidence_ids": ids})
         candidate = {
-            "summary": f"[Demo AI] {incident.title}. The rules suggest {rr.severity}; harm areas: "
-                       f"{', '.join(c.replace('_', ' ') for c in rr.categories)}.",
+            "summary": f"[Demo AI] {incident.title}. The rules suggest {rr.severity}; likely policy: "
+                       f"{', '.join(policies.label(c) for c in policies.ordered(rr.categories)) or 'none'}.",
             "reported_facts": facts,
             "hypotheses": [{"statement": f"Possible {c.replace('_', ' ')} issue", "basis": "Keyword match only; not verified."} for c in rr.categories if c != "benign_noise"],
             "missing_information": missing,

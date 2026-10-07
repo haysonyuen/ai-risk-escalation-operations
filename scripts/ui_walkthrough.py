@@ -213,6 +213,7 @@ def _steps(ui: UI) -> None:
     ui.button("Reverse containment")
     ui.button("Close case…")
     ui.select("Closure category", "ux approval issue", dialog=True)
+    ui.scope(True).get_by_text("Yes, confirmed", exact=True).first.click()  # violation outcome is required at closure
     ui.fill("Root cause", "Share dialog did not show link visibility; assistant defaulted to anyone_with_link.", dialog=True)
     ui.fill("User / customer impact", "File publicly linkable for about 2h; no external access recorded (E5).", dialog=True)
     ui.fill("Actions taken", "Public-link creation restricted (simulated) then reversed; executive brief approved by Legal/Privacy (not sent).", dialog=True)
@@ -220,7 +221,7 @@ def _steps(ui: UI) -> None:
     ui.fill("Sign-off statement", "Reviewed E1-E5; severity kept P0 for the record; no external access found.", dialog=True)
     ui.button("Sign off and close", dialog=True)
     ui.expect("Reopen…")
-    ui.expect("Closed · QA pending")
+    ui.expect("Stage 7 of 8: Closed")
     ui.shot("case_closed")
     ui.section("Activity")
     ui.shot("activity_feed")
