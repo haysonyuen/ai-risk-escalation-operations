@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from common import (GATE_LABEL, GLOSSARY, OVERRIDE_DIRECTION, SPLIT_HELP, SPLIT_NAME, conn, flash, public_demo, section, ver)
+from common import (card, GATE_LABEL, GLOSSARY, OVERRIDE_DIRECTION, SPLIT_HELP, SPLIT_NAME, conn, flash, public_demo, section, ver)
 from riskops import config, evaluation, monitoring, workflow as wf
 from riskops.db import get_setting, rows
 from riskops.rules import available_versions
@@ -94,7 +94,7 @@ def _active_run(runs: list[dict]) -> dict | None:
 def _sentence(s: dict) -> str:
     what = (f"Fault injection run ({FAULT_LABEL.get(s['system'].split(':', 1)[1], s['system']).lower()}). " if s["system"].startswith("fault:")
             else "Fault injection run (deliberately broken rules). " if "fault" in s["rule_version"] else "")
-    return (f"{what}Rules {ver(s['rule_version'])} with safety controls {ver(s.get('controls_version', 'controls-v1.0'))}, "
+    return (f"{what}Rules {ver(s['rule_version'])} with safety checks {ver(s.get('controls_version', 'controls-v1.0'))}, "
             f"on the {SPLIT_NAME[s['split']].lower()} ({s['metrics']['n_cases']} cases, {SPLIT_HELP[s['split']]}).")
 
 
@@ -114,7 +114,7 @@ def _headline(runs: list[dict]) -> None:
         return
     m = s["metrics"]
     a = m["after_deterministic_controls"]
-    st.markdown(f"**Current results:** {run_name(s)} &nbsp;·&nbsp; <span class='small'>after safety checks</span>", unsafe_allow_html=True)
+    st.markdown(f"{run_name(s)} &nbsp;·&nbsp; <span class='small'>active rules on the held-out set, after safety checks</span>", unsafe_allow_html=True)
     active = get_setting(conn(), "active_rule_version")
     if s["rule_version"] != active:
         st.caption(f"No held-out run for the active Rules {ver(active)} yet; showing {run_name(s)}. Run one under **Run evaluation**.")
@@ -389,27 +389,31 @@ def _about(runs: list[dict]) -> None:
 
 # --------------------------------------------------------------------------- page
 
+TAB_KIND = {"Results": "test", "Compare versions": "test", "Run evaluation": "test", "Human overrides": "human", "About & glossary": "ref"}
+
+
 def render() -> None:
     st.title("Quality & evaluation")
-    st.markdown("How well the triage pipeline performs on 80 synthetic cases with known answers.")
-    st.caption("Synthetic test results, not real-world performance. Full caveats under **About & glossary**.")
+    st.caption("How well the triage pipeline performs on 80 synthetic cases with known answers. "
+               "Synthetic test results, not real-world performance. Full caveats under **About & glossary**.")
     runs = _runs()
-    _headline(runs)
+    with card("test", "Current results", "headline"):
+        _headline(runs)
     if goto := st.session_state.pop("_q_goto", None):
         st.session_state["q_section"] = goto
     sec = section(TABS, key="q_section")
-    st.caption(PURPOSE[sec])
-    if sec == "About & glossary":
-        _about(runs)
-    elif sec == "Human overrides":
-        _overrides()
-    elif sec == "Run evaluation":
-        _run_tab()
-    elif not runs:
-        st.info("No runs recorded yet. Start one under **Run evaluation**.")
-    elif sec == "Results":
-        _results(runs)
-    elif len(runs) < 2:
-        st.info("Need at least two runs to compare.")
-    else:
-        _compare(runs)
+    with card(TAB_KIND[sec], sec, "tab_" + sec.split()[0].lower(), PURPOSE[sec]):
+        if sec == "About & glossary":
+            _about(runs)
+        elif sec == "Human overrides":
+            _overrides()
+        elif sec == "Run evaluation":
+            _run_tab()
+        elif not runs:
+            st.info("No runs recorded yet. Start one under **Run evaluation**.")
+        elif sec == "Results":
+            _results(runs)
+        elif len(runs) < 2:
+            st.info("Need at least two runs to compare.")
+        else:
+            _compare(runs)

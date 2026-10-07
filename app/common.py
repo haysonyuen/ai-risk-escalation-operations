@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -193,6 +194,38 @@ def policy_badge(key: str | None, basis: str, prefix: str = "Policy: ") -> str:
     return badge(prefix + policy_label(key) + (" · " + POLICY_BASIS.get(basis, basis) if key else ""), cls, tip)
 
 
+CARD_KINDS = {
+    "live": "📋 Live operations · current cases",
+    "human": "👤 Human decisions",
+    "ai": "✨ AI performance",
+    "test": "🧪 Test results · synthetic cases",
+    "ref": "📘 Reference · prototype settings",
+}
+
+
+@contextmanager
+def card(kind: str, title: str, key: str, caption: str | None = None):
+    """A bordered section whose colour and label say what kind of information it holds (same idea as
+    the case page's source-data / AI cards)."""
+    with st.container(key=f"card-{kind}-{key}"):
+        md(f'<div class="lbl lbl-{kind}">{esc(CARD_KINDS[kind])}</div><div class="card-h">{esc(title)}</div>')
+        if caption:
+            st.caption(caption)
+        yield
+
+
+def duration(minutes: float | None) -> str:
+    """'45m', '3h 20m', '2d 4h'."""
+    if minutes is None:
+        return "—"
+    m = int(round(minutes))
+    if m < 60:
+        return f"{m}m"
+    if m < 1440:
+        return f"{m // 60}h" + (f" {m % 60}m" if m % 60 else "")
+    return f"{m // 1440}d" + (f" {m % 1440 // 60}h" if m % 1440 // 60 else "")
+
+
 def phase_badge(status: str) -> str:
     p = phase(status)
     return badge(p, PHASE_BADGE[p], PHASE_HELP[p])
@@ -302,6 +335,15 @@ h1{font-size:1.7rem!important} h2{font-size:1.35rem!important} h3{font-size:1.15
 .st-key-src_panel{border-left:5px solid #9aa3b2;padding-left:14px}
 .st-key-ai_panel{border-left:5px solid #8e6bd6;padding-left:14px}
 .raw{font-size:0.9rem;white-space:pre-wrap}
+[class*="st-key-card-"]{border:1px solid #e3e5ea;border-radius:9px;padding:12px 16px 14px 16px;margin:4px 0 14px 0}
+[class*="st-key-card-live"]{border-left:5px solid #e05a47}[class*="st-key-card-human"]{border-left:5px solid #3d8b5f}
+[class*="st-key-card-ai"]{border-left:5px solid #8e6bd6;background:#fdfbff}[class*="st-key-card-test"]{border-left:5px solid #d4a017}
+[class*="st-key-card-ref"]{border-left:5px solid #9aa3b2}
+.lbl-live{background:#fde9e6;color:#8a2a1c}.lbl-human{background:#e7f6f1;color:#10573f}.lbl-test{background:#fdf3d6;color:#6b5207}
+.lbl-ref{background:#eef0f3;color:#4a5160}
+.sev-table{border-collapse:collapse;width:100%;font-size:0.88rem;margin:4px 0 8px 0}
+.sev-table th{text-align:left;color:#666;font-weight:600;border-bottom:2px solid #e3e5ea;padding:6px 8px}
+.sev-table td{border-bottom:1px solid #eef0f3;padding:8px;vertical-align:top}
 .trail{border-collapse:collapse;font-size:0.88rem;margin:0 0 8px 0;width:100%}
 .trail td{border:none!important;padding:4px 10px 4px 0;vertical-align:top}
 .trail td:first-child{white-space:nowrap;color:#555;font-weight:600;width:150px}

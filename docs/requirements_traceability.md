@@ -5,7 +5,7 @@ The **Evidence** column points to code, tests (in `tests/`) or results (in `eval
 | # | Requirement | Code | Tests / results | Status |
 | --- | --- | --- | --- | --- |
 | 1 | Eight-stage process | `workflow.py` (`STATUSES`, `STAGE`, `TRANSITIONS`) | `test_invalid_transitions_rejected`, `test_closure_requires_signoff_role_fields_and_state`; screenshots 01–10 | Implemented |
-| 1 | P0–P3 meanings and postures preserved | `docs/framework.md`, Rules page "Severity framework", `playbooks/rules_*.json` | `test_framework_p0_example_is_p0`, `test_child_safety_confirmed_violation_is_p0_child_route`, `test_cross_tenant_confirmed_is_p0_legal` | Implemented |
+| 1 | P0–P3 meanings and postures preserved | `docs/framework.md`, Rules page "Severity & SLA", `playbooks/rules_*.json` | `test_framework_p0_example_is_p0`, `test_child_safety_confirmed_violation_is_p0_child_route`, `test_cross_tenant_confirmed_is_p0_legal` | Implemented |
 | 1 | Configurable SLA targets labeled as prototype assumptions | `config/sla.json`, `config.sla_minutes` | Queue deadlines, Dashboard page | Implemented; values are assumptions |
 | 1 | Impact, evidence quality, AI recommendation and human severity kept separate | `rules.py` (impact/quality/confidence), `assessment.py` (`model_severity`, `controlled_severity`), `incidents.human_severity` | `test_reassessment_preserves_human_decision_and_history`; screenshot 04 | Implemented |
 | 1 | Low confidence does not imply low severity | `FLOOR-01`, control C5 | `test_low_confidence_potentially_severe_is_not_low_severity`, `test_reported_only_refusal_is_not_floored` | Implemented |

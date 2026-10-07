@@ -77,7 +77,7 @@ As Sam:
 *Activity* shows every event as a sentence: who, what, when, with the reason. It also marks seeded history versus demo actions. The raw append-only audit log is available below the feed.
 
 ### 7. Rule change followed by regression evaluation (50 s): `11_regression_check.png`, `12_dashboard.png`, `13_quality.png`
-*Rules & playbooks* → **Change rules + regression check**.
+*Rules & playbooks* → **Change rules**.
 1. As Sam, switch the active version to **rules-v2.1** with a rationale. The change is logged and does not touch existing assessments or decisions.
 2. Click **Run regression check** (baseline v2.0 against v2.1 on the **frozen held-out** split).
 * Result: **No regression on the gated metrics.** This is the honest story: v2.1 fixed all six dev failures but made **no difference to held-out severity** (30/36 for both). Tuning on the development split did not generalize, and the held-out set shows that.

@@ -25,7 +25,7 @@ Conditions use `all` / `any` / `none` over named signals, so every rule can be r
 ### Changing rules (governed)
 
 1. Create a new file with a new `rule_version`, a `parent_version` and a `changelog` that cites the evidence behind each change. Do not edit an evaluated version in place. For example, the v2 held-out misses (EVAL-052, EVAL-057…) are documented in evaluation.md, not patched into v2.1.
-2. Run the regression gate against the baseline on the **held-out** split (UI: Rules & playbooks → Change rules + regression check, or `python -m riskops.cli eval ...` followed by `compare`). The gate flags any drop in P0/P1 recall, mandatory-review compliance, schema validity or C7 automatic-pause recall, and any drop of more than 5 percentage points in severity-range or route accuracy.
+2. Run the regression gate against the baseline on the **held-out** split (UI: Rules & playbooks → Change rules, or `python -m riskops.cli eval ...` followed by `compare`). The gate flags any drop in P0/P1 recall, mandatory-review compliance, schema validity or C7 automatic-pause recall, and any drop of more than 5 percentage points in severity-range or route accuracy.
 3. Only the Incident Lead role can switch the active version, and a rationale is required. The switch is logged as a `rule_version_changed` event. **It does not modify existing assessments or human decisions.** A case is re-scored only when someone re-runs its assessment, and the reassessment never changes the human decision (a disagreement is logged).
 4. If held-out failures are used to motivate a change, record a disclosure in `data/eval/FREEZE.json`, set its status to `used-for-tuning`, and stop calling that set untouched.
 
