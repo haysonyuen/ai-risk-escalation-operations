@@ -131,3 +131,10 @@ Symbols such as ⏸️ ⚠️ ⚑ 🧪 ✓ and "+2" needed decoding, and Streaml
 ## Eighth review: how a recommendation was reached
 
 The side-by-side "AI recommends" / "After safety controls" boxes read as two competing recommendations and did not say what happened. *AI analysis → 1. Recommendation* now shows **one recommendation** (severity, team, policy) and a **How we got here** trail: ① what the AI suggested, ② what the safety checks changed, in a sentence each (or "No change"), and ③ any automatic action (only the session pause exists; otherwise "None. Nothing was done to any system"). "Safety controls" are called **safety checks** in operator views, and the AI's signals are labelled **AI's own read**.
+
+## Ninth review: Oversight pages
+
+The three Oversight pages now use the same idea as the case page: every section is a card whose coloured edge and label say what kind of information it holds (📋 live operations, 👤 human decisions, ✨ AI performance, 🧪 synthetic test results, 📘 reference). The most important information comes first:
+* **Dashboard:** *Needs attention now* (counts and the five most urgent cases) → *Timeliness against SLA targets* (an SLA legend and one readable row per severity, replacing the old median/max table) → *Workload* (one filter row driving status and policy charts side by side) → human oversight → AI health → regression check.
+* **Quality & evaluation:** headline results in a test-results card; each tab's content in a card of the matching kind.
+* **Rules & playbooks:** tabs reordered (*Severity & SLA* first, a single wrapping table of meanings and deadlines); rules open with a one-line summary; rule changes (human decision) and the regression check (test) are separate cards.
