@@ -9,12 +9,12 @@ Jev may become a reference for the LLM (Phase 2).
 
 | Step | State |
 |---|---|
-| 0. Access | Anthropic API reachable. **Jev API not reachable from this environment** (`api.typesafe.ai` blocked by the network policy); no keys stored as secrets yet |
+| 0. Access | Re-checked 2026-10-09: `api.typesafe.ai` now answers over HTTPS, but **`TYPESAFE_API_KEY` and `ANTHROPIC_API_KEY` are still not set** in the environment, so no Jev or LLM call can be made |
 | 1. Labels and new cases | Done: 20 external-source cases, Phase 1 labels on all 100 cases, conventions in `docs/policy_conventions.md` |
 | 2. Question design | Done: `config/jev_questions.json` (`jev-questions-v1`) |
 | 3. Build | Done: Jev client, shadow store, `jev-eval`, admin role and admin-only views, tests |
-| 4. Tune on dev | **Waiting for Jev access** |
-| 5. Final run and go/no-go | **Waiting for Jev access** (and the LLM baseline, which needs `ANTHROPIC_API_KEY` as a secret) |
+| 4. Tune on dev | **Blocked: API keys not set** (attempted 2026-10-09) |
+| 5. Final run and go/no-go | **Blocked: API keys not set.** No go/no-go decision has been made |
 
 No Jev or LLM results exist yet. Nothing in the app or this document reports any.
 
