@@ -22,7 +22,10 @@ Scope = Literal["single_user", "multiple_users", "workspace", "multiple_customer
 Recurrence = Literal["first_report", "repeated", "unknown"]
 Reversibility = Literal["reversible", "irreversible", "partially_reversible", "unknown"]
 CustomerType = Literal["consumer", "enterprise", "internal", "unknown"]
-Channel = Literal["support_ticket", "enterprise_report", "safety_reviewer", "internal_observation", "telemetry_alert"]
+Channel = Literal["support_ticket", "enterprise_report", "safety_reviewer", "internal_observation", "telemetry_alert",
+                  # External sources (2026-10): claims from these are assessed like any other report.
+                  "law_enforcement", "regulator", "ngo_partner", "researcher", "legal_counsel"]
+CHANNELS = list(Channel.__args__)
 EvidenceType = Literal[
     "reporter_statement", "conversation_excerpt", "tool_action_log", "file_diff", "approval_event",
     "telemetry", "classifier_output", "account_settings", "screenshot_description", "reviewer_note",

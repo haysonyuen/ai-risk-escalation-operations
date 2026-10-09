@@ -8,7 +8,7 @@ import streamlit as st
 from common import EVIDENCE_TYPES, conn, section, current_actor, go_case, pretty, provider_for_mode, run_inline
 from riskops import config, dedup, workflow as wf
 from riskops.db import rows
-from riskops.schemas import IncidentIntake
+from riskops.schemas import CHANNELS, IncidentIntake
 
 TRI = ["unknown", "yes", "no"]
 
@@ -16,6 +16,11 @@ TRI = ["unknown", "yes", "no"]
 
 EV_LABEL = {k: k.replace("_", " ").capitalize() for k in EVIDENCE_TYPES}
 EV_KEY = {v: k for k, v in EV_LABEL.items()}
+
+
+CHANNEL_LABEL = {"ngo_partner": "NGO / hotline / civil-society partner", "law_enforcement": "Law enforcement",
+                 "regulator": "Regulator", "researcher": "Security or academic researcher",
+                 "legal_counsel": "Legal correspondence (law firm, court)"}
 
 
 def _next_id() -> str:
@@ -86,7 +91,7 @@ def render() -> None:
             st.markdown("##### Where and who")
             a1, a2, a3, a4 = st.columns(4)
             customer = a1.selectbox("Customer type", ["unknown", "consumer", "enterprise", "internal"])
-            channel = a2.selectbox("Reported via", ["support_ticket", "enterprise_report", "safety_reviewer", "internal_observation", "telemetry_alert"], format_func=pretty)
+            channel = a2.selectbox("Reported via", CHANNELS, format_func=lambda c: CHANNEL_LABEL.get(c, pretty(c)))
             surface = a3.text_input("Product surface", placeholder="unknown")
             model = a4.text_input("Model / product version", placeholder="unknown")
 

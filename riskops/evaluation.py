@@ -42,25 +42,46 @@ def load_splits() -> dict:
     return json.loads((config.EVAL_DIR / "splits.json").read_text())
 
 
+# Phase 1 (Jev shadow evaluation) adds an "external" split in its own folder, so the frozen
+# eval-v2 files stay byte-identical. "all" keeps its original meaning (dev + held-out).
+EXTERNAL_DIR = config.EVAL_DIR / "external"
+
+
+def _jsonl(path) -> list[str]:
+    return [line for line in path.read_text().splitlines() if line.strip()] if path.exists() else []
+
+
 def load_cases(split: str = "dev") -> list[IncidentIntake]:
+    if split == "external":
+        return [IncidentIntake.model_validate_json(line) for line in _jsonl(EXTERNAL_DIR / "cases.jsonl")]
     splits = load_splits()
     ids = set(splits["dev"] + splits["held_out"]) if split == "all" else set(splits[split])
     out = []
-    for line in (config.EVAL_DIR / "cases.jsonl").read_text().splitlines():
-        if line.strip():
-            c = IncidentIntake.model_validate_json(line)
-            if c.incident_id in ids:
-                out.append(c)
+    for line in _jsonl(config.EVAL_DIR / "cases.jsonl"):
+        c = IncidentIntake.model_validate_json(line)
+        if c.incident_id in ids:
+            out.append(c)
     return out
 
 
-def load_labels() -> dict[str, dict]:
+def load_labels(include_external: bool = False) -> dict[str, dict]:
     labels = {}
-    for line in (config.EVAL_DIR / "labels.jsonl").read_text().splitlines():
-        if line.strip():
-            lab = json.loads(line)
-            labels[lab["incident_id"]] = lab
+    extra = _jsonl(EXTERNAL_DIR / "labels.jsonl") if include_external else []
+    for line in _jsonl(config.EVAL_DIR / "labels.jsonl") + extra:
+        lab = json.loads(line)
+        labels[lab["incident_id"]] = lab
     return labels
+
+
+def load_phase1_labels() -> dict[str, dict]:
+    """Phase 1 labels (case type, harm outcome, evidence support) for every eval case: the
+    supplementary file for eval-v2, and the external split's own labels."""
+    keys = ("case_type", "harm_outcome", "harm_outcome_also_ok", "evidence_supports_claim")
+    out = {}
+    for line in _jsonl(config.EVAL_DIR / "phase1_labels.jsonl") + _jsonl(EXTERNAL_DIR / "labels.jsonl"):
+        lab = json.loads(line)
+        out[lab["incident_id"]] = {k: lab.get(k) for k in keys} | {"convention_question": lab.get("convention_question", "")}
+    return out
 
 
 def held_out_integrity() -> dict:
@@ -216,7 +237,7 @@ def run_eval(system: str = "rules", rule_version: str = config.BASELINE_RULE_VER
             "confidence", "categories", "auto_hold")} | {"triggered_rules": [t["id"] for t in rec["rule_result"]["triggered_rules"]],
                               "facts": (rec["output"] or {}).get("reported_facts", [])})
     # Labels are joined only now, after all predictions exist.
-    labels = load_labels()
+    labels = load_labels(include_external=(split == "external"))
     for p in preds:
         p["label"] = labels[p["incident_id"]]
     metrics = score(preds)
@@ -278,7 +299,7 @@ def run_eval(system: str = "rules", rule_version: str = config.BASELINE_RULE_VER
 
 def write_claim_worksheet(preds: list[dict], path: Path) -> None:
     """Blank worksheet for human claim-support review. Verdict column intentionally empty."""
-    cases = {c.incident_id: c for c in load_cases("all")}
+    cases = {c.incident_id: c for c in load_cases("all") + load_cases("external")}
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["incident_id", "fact_index", "statement", "cited_evidence_ids", "cited_evidence_text",

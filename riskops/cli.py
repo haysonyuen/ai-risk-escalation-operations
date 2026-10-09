@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--system", default="rules", help="rules | live | fault:<mode>")
     e.add_argument("--rules", default=config.BASELINE_RULE_VERSION)
     e.add_argument("--prompt", default="prompt-v3")
-    e.add_argument("--split", default="dev", choices=["dev", "held_out", "all"])
+    e.add_argument("--split", default="dev", choices=["dev", "held_out", "all", "external"])
     e.add_argument("--label", default=None)
     e.add_argument("--record-in-db", action="store_true", help="also record the run summary in the app database")
 
