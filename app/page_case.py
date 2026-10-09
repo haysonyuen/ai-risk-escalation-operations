@@ -12,6 +12,7 @@ from common import (action_label, control_name, policy_badge, policy_label, read
                     TEAMS, actor_name, ago, badge, conn, current_actor, describe_event, esc, feedback, go, md,
                     permission_hint, pretty, provider_for_mode, relative, run_action, run_inline, section, sev_badge,
                     source_badge, stepper)
+import view_jev
 from riskops import communications, dedup, monitoring, policies, workflow as wf
 from riskops.db import rows
 from riskops.schemas import CONTAINMENT_TYPES, ROUTES, SEVERITIES, Evidence
@@ -382,6 +383,7 @@ def _ai_analysis(inc, intake, a) -> None:
                 st.markdown("#### 6. Suggested next steps")
                 st.markdown("\n".join(f"- {s}" for s in o["next_steps"]))
 
+        view_jev.case_box(inc["incident_id"])
         with st.expander("How this was produced"):
             md(source_badge(a["provider_kind"]) + f'<span class="small">Rules {ver(a["rule_version"])} · prompt {ver(a["prompt_version"])} · '
                f'safety controls {ver(ctl.get("controls_version", "controls-v1.0"))} · {ago(a["created_at"])}</span>')

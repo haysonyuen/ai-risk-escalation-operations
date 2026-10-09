@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from common import (card, GATE_LABEL, GLOSSARY, OVERRIDE_DIRECTION, SPLIT_HELP, SPLIT_NAME, conn, flash, public_demo, section, ver)
+import view_jev
 from riskops import config, evaluation, monitoring, workflow as wf
 from riskops.db import get_setting, rows
 from riskops.rules import available_versions
@@ -401,9 +402,13 @@ def render() -> None:
         _headline(runs)
     if goto := st.session_state.pop("_q_goto", None):
         st.session_state["q_section"] = goto
-    sec = section(TABS, key="q_section")
-    with card(TAB_KIND[sec], sec, "tab_" + sec.split()[0].lower(), PURPOSE[sec]):
-        if sec == "About & glossary":
+    tabs = TABS + (["Jev shadow"] if view_jev.allowed() else [])
+    sec = section(tabs, key="q_section")
+    with card(TAB_KIND.get(sec, "test"), sec, "tab_" + sec.split()[0].lower(),
+              PURPOSE.get(sec, "Admin only: Jev answers measured in shadow mode, never used in decisions.")):
+        if sec == "Jev shadow":
+            view_jev.report()
+        elif sec == "About & glossary":
             _about(runs)
         elif sec == "Human overrides":
             _overrides()

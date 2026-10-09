@@ -195,6 +195,8 @@ def seed(path: str | None = None, now: datetime | None = None) -> Path:
     # Import evaluation runs already on disk so the Quality page shows actual artifacts.
     for d in sorted(RESULTS_DIR.glob("*/summary.json")):
         s = json.loads(d.read_text())
+        if s.get("kind") == "jev_shadow":  # Phase 1 shadow runs are read from disk by the admin view only
+            continue
         s["artifact_dir"] = str(d.parent)
         wf.record_eval_run(conn, s, origin="cli")
     conn.commit()

@@ -57,6 +57,7 @@ ROLE_LABELS = {
     "legal_privacy": "Legal/Privacy Reviewer",
     "support_agent": "Support Agent",
     "engineering": "Engineering On-call",
+    "admin": "Admin (sees everything, incl. Jev shadow results)",
     "system": "AI assistant / automation (not a person)",
 }
 SIMULATED_ACTORS = [
@@ -66,6 +67,8 @@ SIMULATED_ACTORS = [
     Actor("jordan.legal", "Jordan — Legal/Privacy (simulated)", "legal_privacy"),
     Actor("casey.support", "Casey — Support Agent (simulated)", "support_agent"),
     Actor("lee.eng", "Lee — Engineering On-call (simulated)", "engineering"),
+    # Project owner's admin view. Sees everything, including Jev shadow results; no extra case-decision rights.
+    Actor("hayson.admin", "Hayson — Admin", "admin"),
 ]
 SYSTEM_ACTOR = Actor("system.assistant", "AI assistant / automation", "system")
 HUMAN_ROLES = {a.role for a in SIMULATED_ACTORS}
@@ -97,6 +100,7 @@ PERMISSIONS: dict[str, set[str]] = {
     "qa_review": TRIAGE_ROLES,
     "claim_review": TRIAGE_ROLES | {"safety_specialist", "legal_privacy"},
     "change_rule_version": {"incident_lead"},
+    "view_shadow": {"admin"},  # Phase 1: Jev shadow answers (hidden from operators so they cannot sway decisions)
 }
 SPECIALIST_REVIEW_ROLE = {"Legal/Privacy": "legal_privacy", "Safety": "safety_specialist", "Child Safety": "safety_specialist"}
 

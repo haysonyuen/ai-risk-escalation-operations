@@ -243,8 +243,9 @@ FIELD_LABEL = {
     "user_approved": "User approved", "sensitive_data": "Sensitive data", "scope": "Scope", "recurrence": "Recurrence",
     "reversibility": "Reversibility",
 }
-SPLIT_NAME = {"dev": "Dev set", "held_out": "Held-out set", "all": "All cases"}
-SPLIT_HELP = {"dev": "used for tuning", "held_out": "frozen, never used for tuning", "all": "dev + held-out"}
+SPLIT_NAME = {"dev": "Dev set", "held_out": "Held-out set", "all": "All cases", "external": "External-source set"}
+SPLIT_HELP = {"dev": "used for tuning", "held_out": "frozen, never used for tuning", "all": "dev + held-out",
+              "external": "20 cases from law enforcement, regulators, partners, researchers and detectors"}
 GATE_LABEL = {"P0/P1 recall (after controls)": "P0/P1 recall", "Mandatory review compliance": "Mandatory review flagged when needed",
               "Severity within acceptable range": "Severity within range", "Primary route acceptable": "Route acceptable",
               "Schema-valid rate": "Valid AI output", "C7 auto-pause recall": "Auto-pause recall"}

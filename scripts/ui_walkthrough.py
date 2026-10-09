@@ -261,6 +261,13 @@ def _steps(ui: UI) -> None:
     ui.section("About & glossary")
     ui.expect("Regression gate")
 
+    print("9. Jev shadow report is admin-only (Phase 1)")
+    assert ui.p.get_by_text("Jev shadow", exact=True).count() == 0, "operators must not see Jev shadow results"
+    ui.actor("Hayson")
+    ui.section("Jev shadow")
+    ui.expect("Pass criteria were fixed before any results existed")
+    ui.shot("quality_jev_shadow")
+
 
 def main(out: Path) -> int:
     out.mkdir(parents=True, exist_ok=True)

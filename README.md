@@ -164,6 +164,8 @@ Full method, results, observed failures and limitations: [`docs/evaluation.md`](
 | [docs/ux_review.md](docs/ux_review.md) | Interface review: problems found and the operator-focused redesign |
 | [docs/requirements_traceability.md](docs/requirements_traceability.md) | Requirement → code / test / result table |
 | [docs/timed_review_protocol.md](docs/timed_review_protocol.md) | Optional procedure for a future timed-review user study |
+| [docs/jev_phase1.md](docs/jev_phase1.md) | Phase 1 (in progress): measuring TypeSafe's Jev in shadow mode; no results yet |
+| [docs/policy_conventions.md](docs/policy_conventions.md) | How policy area, case type, what happened and evidence support are labelled |
 
 ## Repository layout
 
