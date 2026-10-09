@@ -1,0 +1,211 @@
+{
+ "kind": "jev_shadow",
+ "split": "held_out",
+ "variant": "A",
+ "repeats": 3,
+ "question_version": "jev-questions-v1",
+ "model": "jev-1.13.0",
+ "cases": 36,
+ "errors": 0,
+ "error_examples": [],
+ "policy": {
+  "top1": {
+   "num": 32,
+   "den": 36,
+   "value": 0.8888888888888888
+  },
+  "top2": {
+   "num": 35,
+   "den": 36,
+   "value": 0.9722222222222222
+  },
+  "severe_cases": 11,
+  "severe_policy_miss": 0,
+  "severe_policy_miss_ids": [],
+  "top1_by_confidence": [
+   {
+    "band": "below 0.5",
+    "cases": 0,
+    "top1_correct": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    }
+   },
+   {
+    "band": "0.5\u20130.8",
+    "cases": 6,
+    "top1_correct": {
+     "num": 4,
+     "den": 6,
+     "value": 0.6666666666666666
+    }
+   },
+   {
+    "band": "0.8 and above",
+    "cases": 30,
+    "top1_correct": {
+     "num": 28,
+     "den": 30,
+     "value": 0.9333333333333333
+    }
+   }
+  ]
+ },
+ "severity": {
+  "A_direct": {
+   "within_range": {
+    "num": 32,
+    "den": 36,
+    "value": 0.8888888888888888
+   },
+   "under_calls_p0p1": {
+    "num": 2,
+    "den": 16,
+    "value": 0.125
+   },
+   "p0_called_p2_or_lower": 0,
+   "over_calls": {
+    "num": 2,
+    "den": 36,
+    "value": 0.05555555555555555
+   },
+   "under_call_ids": [
+    "EVAL-045",
+    "EVAL-072"
+   ],
+   "p0_low_ids": []
+  },
+  "B_factors_rules": {
+   "within_range": {
+    "num": 29,
+    "den": 36,
+    "value": 0.8055555555555556
+   },
+   "under_calls_p0p1": {
+    "num": 2,
+    "den": 16,
+    "value": 0.125
+   },
+   "p0_called_p2_or_lower": 0,
+   "over_calls": {
+    "num": 5,
+    "den": 36,
+    "value": 0.1388888888888889
+   },
+   "under_call_ids": [
+    "EVAL-052",
+    "EVAL-057"
+   ],
+   "p0_low_ids": []
+  }
+ },
+ "severity_approach_for_criteria": "B_factors_rules",
+ "severity_approach_fixed_in_advance": true,
+ "case_type": {
+  "num": 32,
+  "den": 36,
+  "value": 0.8888888888888888
+ },
+ "harm_outcome": {
+  "num": 33,
+  "den": 36,
+  "value": 0.9166666666666666
+ },
+ "evidence_support": {
+  "num": 20,
+  "den": 33,
+  "value": 0.6060606060606061
+ },
+ "stability": {
+  "repeats": 3,
+  "top_policy_changed": {
+   "num": 0,
+   "den": 36,
+   "value": 0.0
+  },
+  "severity_a_changed": {
+   "num": 0,
+   "den": 36,
+   "value": 0.0
+  },
+  "median_top_probability_spread": 0.0
+ },
+ "input_tokens": 330393,
+ "cost_usd_estimate": 0.0139,
+ "criteria": [
+  {
+   "id": "severe_policy_miss",
+   "label": "Severe-harm cases where Jev gives the severe policy < 20%",
+   "target": "0",
+   "value": 0,
+   "passed": true
+  },
+  {
+   "id": "p0_called_p2_or_lower",
+   "label": "P0 cases called P2 or lower",
+   "target": "0",
+   "value": 0,
+   "passed": true
+  },
+  {
+   "id": "severity_within_range",
+   "label": "Severity within the acceptable range",
+   "target": "\u2265 80%",
+   "value": 0.8055555555555556,
+   "passed": true
+  },
+  {
+   "id": "policy_top2",
+   "label": "Correct policy in the top 2",
+   "target": "\u2265 85%",
+   "value": 0.9722222222222222,
+   "passed": true
+  }
+ ],
+ "labels_note": "Author labels, not reviewed by the project owner; see docs/jev_phase1.md.",
+ "passed": true,
+ "llm_comparison": {
+  "run": "20261009T081215-live_model-live-rules-v2.1-held_out-f70c",
+  "provider_kind": "live_model",
+  "cases_compared": 36,
+  "llm_policy": {
+   "top1": {
+    "num": 33,
+    "den": 36,
+    "value": 0.9166666666666666
+   },
+   "top2": {
+    "num": 35,
+    "den": 36,
+    "value": 0.9722222222222222
+   }
+  },
+  "llm_severity": {
+   "within_range": {
+    "num": 33,
+    "den": 36,
+    "value": 0.9166666666666666
+   },
+   "under_calls_p0p1": {
+    "num": 1,
+    "den": 16,
+    "value": 0.0625
+   },
+   "p0_called_p2_or_lower": 0,
+   "over_calls": {
+    "num": 2,
+    "den": 36,
+    "value": 0.05555555555555555
+   },
+   "under_call_ids": [
+    "EVAL-057"
+   ],
+   "p0_low_ids": []
+  },
+  "policy_disagreements": [
+   "EVAL-065"
+  ]
+ },
+ "run_id": "20261009T081253-jev_shadow-A-held_out-a334"
+}
