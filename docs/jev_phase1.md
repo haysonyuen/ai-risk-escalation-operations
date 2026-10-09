@@ -9,7 +9,7 @@ Jev may become a reference for the LLM (Phase 2).
 
 | Step | State |
 |---|---|
-| 0. Access | Re-checked 2026-10-09: `api.typesafe.ai` now answers over HTTPS, but **`TYPESAFE_API_KEY` and `ANTHROPIC_API_KEY` are still not set** in the environment, so no Jev or LLM call can be made |
+| 0. Access | Re-checked 2026-10-09: `api.typesafe.ai` answers and `TYPESAFE_API_KEY` reaches cloud sessions, but **cloud sessions withhold `ANTHROPIC_API_KEY`** even when it is saved. Steps 4–5 must run locally: see `docs/jev_phase1_handover.md` |
 | 1. Labels and new cases | Done: 20 external-source cases, Phase 1 labels on all 100 cases, conventions in `docs/policy_conventions.md` |
 | 2. Question design | Done: `config/jev_questions.json` (`jev-questions-v1`) |
 | 3. Build | Done: Jev client, shadow store, `jev-eval`, admin role and admin-only views, tests |
