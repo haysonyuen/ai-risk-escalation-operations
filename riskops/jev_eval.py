@@ -123,7 +123,12 @@ def pass_fail(policy: dict, sev: dict) -> list[dict]:
 
 
 def run(split: str = "dev", variant: str = "A", repeats: int = 3, llm_run: str | None = None,
-        client: JevClient | None = None, label: str | None = None, write: bool = True) -> dict:
+        client: JevClient | None = None, label: str | None = None, write: bool = True,
+        severity_approach: str | None = None) -> dict:
+    """``severity_approach`` fixes which severity approach the criteria use. Leave it unset only on
+    dev: picking the better approach on held_out/external would be choosing on the test data."""
+    if severity_approach not in (None, "A_direct", "B_factors_rules"):
+        raise ValueError(f"unknown severity approach {severity_approach!r}")
     if client is None and not credentials_available():
         raise JevUnavailable("Jev evaluation requires TYPESAFE_API_KEY and network access to the Jev API. "
                              "Nothing was run and no results were substituted.")
@@ -141,7 +146,8 @@ def run(split: str = "dev", variant: str = "A", repeats: int = 3, llm_run: str |
     first = runs[0]
     ok = [p for p in first if not p["errors"]]
     severity = {"A_direct": score_severity(ok, "severity_a"), "B_factors_rules": score_severity(ok, "severity_b")}
-    best = max(severity, key=lambda k: (severity[k]["p0_called_p2_or_lower"] == 0, severity[k]["within_range"]["value"] or 0))
+    best = severity_approach or max(
+        severity, key=lambda k: (severity[k]["p0_called_p2_or_lower"] == 0, severity[k]["within_range"]["value"] or 0))
     policy = score_policy(ok)
     summary = {
         "kind": "jev_shadow", "split": split, "variant": variant, "repeats": repeats,
@@ -149,6 +155,7 @@ def run(split: str = "dev", variant: str = "A", repeats: int = 3, llm_run: str |
         "cases": len(cases), "errors": len(first) - len(ok),
         "error_examples": [e for p in first for e in p["errors"]][:3],
         "policy": policy, "severity": severity, "severity_approach_for_criteria": best,
+        "severity_approach_fixed_in_advance": severity_approach is not None,
         "case_type": score_classification(ok, "case_type", "case_type"),
         "harm_outcome": score_classification(ok, "harm_outcome", "harm_outcome", "harm_outcome_also_ok"),
         "evidence_support": score_classification(ok, "evidence_support", "evidence_supports_claim"),

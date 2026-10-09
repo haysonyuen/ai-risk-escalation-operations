@@ -40,6 +40,8 @@ def main(argv: list[str] | None = None) -> int:
     j.add_argument("--repeats", type=int, default=3)
     j.add_argument("--llm-run", default=None, help="live LLM evaluation run directory on the same split, for comparison")
     j.add_argument("--label", default=None)
+    j.add_argument("--severity-approach", default=None, choices=["A_direct", "B_factors_rules"],
+                   help="fix the severity approach the criteria use (required in spirit for held_out/external: chosen on dev)")
 
     c = sub.add_parser("compare", help="compare run directories")
     c.add_argument("runs", nargs="+")
@@ -74,7 +76,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "jev-eval":
         from . import jev_eval
         try:
-            s = jev_eval.run(args.split, args.variant, args.repeats, args.llm_run, label=args.label)
+            s = jev_eval.run(args.split, args.variant, args.repeats, args.llm_run, label=args.label,
+                             severity_approach=args.severity_approach)
         except jev_eval.JevUnavailable as exc:
             print(str(exc), file=sys.stderr)
             return 2

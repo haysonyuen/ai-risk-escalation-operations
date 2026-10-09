@@ -3,10 +3,11 @@
 Jev is a decision model: it reads a *state* and answers typed *questions* with a probability per
 option. Nothing here feeds the rules, the workflow or the AI assessment (see riskops/shadow.py).
 
-The request/response shape follows TypeSafe's published examples as summarised by third-party
-guides; it could not be checked against the live API when this was written. All format handling
-is in ``build_request`` and ``parse_response`` so the first live call can confirm or correct it.
-An answer that cannot be parsed is recorded as an error with the raw response, never guessed.
+The request/response shape was confirmed against the live API (jev-1.13.0, 2026-10-09): score
+questions take their ordered levels as a ``criteria`` list, and answer with an expected ``score``
+(a float, e.g. 2.42) plus ``probabilities`` keyed by level index. All format handling is in
+``build_request`` and ``parse_response``. An answer that cannot be parsed is recorded as an error
+with the raw response, never guessed.
 
 The API key is read from TYPESAFE_API_KEY and is never logged or stored.
 """
@@ -30,9 +31,9 @@ def base_url() -> str:
 
 
 def model_name() -> str:
-    # "jev-latest" moves with each release; set JEV_MODEL to a pinned version once /v1/models
-    # shows the available names. The model actually used is recorded with every result.
-    return os.environ.get("JEV_MODEL", "jev-latest")
+    # Pinned to the version the live API reported on 2026-10-09 ("jev-latest" moves with each
+    # release). The model actually used is recorded with every result.
+    return os.environ.get("JEV_MODEL", "jev-1.13.0")
 
 
 def credentials_available() -> bool:
@@ -65,8 +66,8 @@ def build_request(state, questions: dict[str, dict], model: str) -> dict:
         item = {"type": q["type"], "instructions": q["instructions"]}
         if q["type"] == "choice":
             item["criteria"] = q["criteria"]
-        else:  # score: ordered levels, lowest first
-            item["levels"] = q["levels"]
+        else:  # score: ordered levels, lowest first, sent as a criteria list
+            item["criteria"] = q["levels"]
         qs[name] = item
     return {"model": model, "state": state, "questions": qs}
 
@@ -98,8 +99,12 @@ def parse_response(body: dict, questions: dict[str, dict]) -> dict[str, JevAnswe
         else:
             options = [lvl.split(":")[0].split()[0] for lvl in q["levels"]]
             s = a.get("score", a.get("answer"))
-            answer = options[int(s)] if isinstance(s, (int, float)) and 0 <= int(s) < len(options) else s
+            answer = options[round(s)] if isinstance(s, (int, float)) and 0 <= round(s) < len(options) else s
         probs = _probabilities(a.get("probabilities"), options)
+        if q["type"] == "score" and probs and isinstance(a.get("score", a.get("answer")), (int, float)):
+            # The score is an expected value over levels; report the most likely level, not a
+            # truncation of the mean (which would bias towards lower severity).
+            answer = max(probs, key=probs.get)
         if probs and set(probs) - set(options):
             raise ValueError(f"question '{name}': unexpected options {sorted(set(probs) - set(options))}")
         if answer is None and probs:
@@ -138,6 +143,10 @@ class JevClient:
             body = self._post(build_request(state, questions, self.model))
         except urllib.error.HTTPError as e:
             res.error_kind, res.error = "unavailable", f"Jev returned HTTP {e.code}"
+            try:  # validation details only; the request carries no secrets in its body
+                res.raw = {"status": e.code, "body": e.read().decode()[:2000]}
+            except Exception:
+                pass
         except TimeoutError:
             res.error_kind, res.error = "timeout", f"Jev timed out after {self.timeout}s"
         except (urllib.error.URLError, OSError) as e:

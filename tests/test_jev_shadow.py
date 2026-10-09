@@ -20,7 +20,7 @@ def fake_transport(pick=0):
     def _t(payload):
         answers = {}
         for name, q in payload["questions"].items():
-            options = list(q["criteria"]) if q["type"] == "choice" else [l.split(":")[0].split()[0] for l in q["levels"]]
+            options = list(q["criteria"]) if q["type"] == "choice" else [l.split(":")[0].split()[0] for l in q["criteria"]]
             i = min(pick, len(options) - 1)
             rest = (1 - 0.7) / max(len(options) - 1, 1)
             probs = {o: (0.7 if j == i else rest) for j, o in enumerate(options)}
@@ -37,6 +37,28 @@ def test_parse_choice_and_score_answers():
     a = parse_response(body, qs)
     assert a["c"].answer == "no" and a["c"].confidence == 0.8
     assert a["s"].answer == "P1" and a["s"].probabilities["P0"] == 0.1
+
+
+def test_score_questions_send_levels_as_criteria_list():
+    from riskops.providers.jev import build_request
+    levels = ["P3 Low: x", "P2 Medium: y", "P1 High: z", "P0 Critical: w"]
+    req = build_request({}, {"s": {"type": "score", "instructions": "?", "levels": levels}}, "jev-1.13.0")
+    assert req["questions"]["s"]["criteria"] == levels and "levels" not in req["questions"]["s"]
+
+
+def test_parse_recorded_live_score_response():
+    """Shape recorded from the live API (jev-1.13.0, 2026-10-09); the expected score is a float."""
+    qs = {"severity_direct": {"type": "score", "levels": ["P3 Low: a", "P2 Medium: b", "P1 High: c", "P0 Critical: d"]}}
+    body = {"model": "jev-1.13.0",
+            "answers": {"severity_direct": {"type": "score", "score": 2.42, "confidence": 0.57,
+                                            "legend": {"0": "P3 Low: a", "1": "P2 Medium: b", "2": "P1 High: c", "3": "P0 Critical: d"},
+                                            "probabilities": {"0": 0.0, "1": 0.0, "2": 0.57, "3": 0.43}}},
+            "usage": {"input_tokens": 802, "output_tokens": 18}}
+    a = parse_response(body, qs)["severity_direct"]
+    assert a.answer == "P1" and a.confidence == 0.57 and a.probabilities == {"P3": 0.0, "P2": 0.0, "P1": 0.57, "P0": 0.43}
+    # most likely level, not a truncation of the expected score
+    body["answers"]["severity_direct"].update(score=2.9, probabilities={"0": 0.0, "1": 0.0, "2": 0.1, "3": 0.9})
+    assert parse_response(body, qs)["severity_direct"].answer == "P0"
 
 
 def test_parse_rejects_unknown_options_and_missing_answers():
@@ -116,3 +138,9 @@ def test_assessment_records_shadow_when_configured_and_survives_failure(conn, ac
     rec2 = wf.run_assessment(conn, "T-1", OfflineSimulationProvider())
     assert rec2["controlled_severity"] == rec["controlled_severity"]  # assessment unaffected
     assert json.loads(json.dumps(rec2["rule_result"]))  # still a complete record
+
+
+def test_severity_approach_can_be_fixed_in_advance():
+    s = jev_eval.run("dev", "A", repeats=1, client=JevClient(transport=fake_transport()), write=False,
+                     severity_approach="A_direct")
+    assert s["severity_approach_for_criteria"] == "A_direct" and s["severity_approach_fixed_in_advance"]
