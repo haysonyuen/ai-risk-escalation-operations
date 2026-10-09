@@ -116,6 +116,12 @@ L = {
 }
 
 
+# Decision on the three convention questions (made without owner review, per the owner's instruction
+# to proceed): the frozen label and the "topic always" reading are BOTH accepted when scoring.
+ALSO_ACCEPTABLE_CATEGORIES = {"EVAL-014": ["enterprise_data_leakage"], "EVAL-055": ["model_security"],
+                              "EVAL-068": ["bias_discrimination"]}
+
+
 def main() -> None:
     with open(OUT, "w") as f:
         for cid, (ctype, outcome, support, also, question) in L.items():
@@ -123,7 +129,9 @@ def main() -> None:
             assert all(o in HARM_OUTCOMES for o in also), cid
             f.write(json.dumps({"incident_id": cid, "case_type": ctype, "harm_outcome": outcome,
                                 "harm_outcome_also_ok": also, "evidence_supports_claim": support,
-                                "convention_question": question, "label_status": "draft-awaiting-owner-review"}) + "\n")
+                                "convention_question": question,
+                                "also_acceptable_categories": ALSO_ACCEPTABLE_CATEGORIES.get(cid, []),
+                                "label_status": "author-label-not-owner-reviewed"}) + "\n")
     print(f"wrote {len(L)} phase-1 labels to {OUT}")
 
 

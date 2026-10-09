@@ -38,6 +38,30 @@ def incident_payload(incident: IncidentIntake) -> str:
     return "<incident_data>\n" + json.dumps(data, indent=1) + "\n</incident_data>"
 
 
+# JSON-schema keywords the structured-outputs API does not accept. They are dropped from the schema
+# sent to the API; the full Pydantic model still validates the answer afterwards (control C1).
+_UNSUPPORTED = {"minLength", "maxLength", "minItems", "maxItems", "minimum", "maximum", "multipleOf",
+                "exclusiveMinimum", "exclusiveMaximum", "pattern", "default", "title", "uniqueItems"}
+
+
+def _api_schema(node):
+    if isinstance(node, dict):
+        out = {k: _api_schema(v) for k, v in node.items() if k not in _UNSUPPORTED}
+        if out.get("type") == "object":
+            out["additionalProperties"] = False
+            out["required"] = list(out.get("properties", {}))
+        return out
+    if isinstance(node, list):
+        return [_api_schema(v) for v in node]
+    return node
+
+
+def api_json_schema() -> dict:
+    """AssessmentOutput as a structured-outputs schema, so the model can only return valid JSON
+    of the right shape (prompt-v3 in free-text mode produced malformed JSON on Claude Opus 5)."""
+    return _api_schema(AssessmentOutput.model_json_schema())
+
+
 def extract_json(text: str) -> dict:
     """Parse a JSON object from model text; tolerate a surrounding code fence only."""
     t = text.strip()
@@ -75,8 +99,9 @@ class AnthropicProvider:
         try:
             msg = self._get_client().messages.create(
                 model=self.model,
-                max_tokens=8000,
+                max_tokens=16000,
                 system=load_prompt(prompt_version),
+                output_config={"format": {"type": "json_schema", "schema": api_json_schema()}},
                 messages=[{"role": "user", "content": "Assess this incident.\n\n" + incident_payload(incident)}],
             )
         except anthropic.APITimeoutError:

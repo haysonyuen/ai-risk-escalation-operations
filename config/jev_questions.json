@@ -1,0 +1,268 @@
+{
+ "version": "jev-questions-v1",
+ "notes": "Phase 1 shadow questions. Never read by rules, workflow or assessment. See docs/jev_phase1.md.",
+ "deterministic_case_type": {
+  "telemetry_alert": "detection_alert"
+ },
+ "factor_fields": {
+  "factor_scope": "scope",
+  "factor_reversibility": "reversibility",
+  "factor_sensitive_data": "sensitive_data",
+  "factor_external_action": "external_action_attempted",
+  "factor_user_approved": "user_approved",
+  "factor_recurrence": "recurrence"
+ },
+ "severe_codes": [
+  "CS-01",
+  "WP-01",
+  "SH-01",
+  "VE-01",
+  "NC-01"
+ ],
+ "variants": {
+  "A": [
+   "policy_a",
+   "case_type",
+   "harm_outcome",
+   "severity_direct",
+   "factor_scope",
+   "factor_reversibility",
+   "factor_sensitive_data",
+   "factor_external_action",
+   "factor_user_approved",
+   "factor_recurrence",
+   "evidence_support"
+  ],
+  "B": [
+   "severe_CS-01",
+   "severe_WP-01",
+   "severe_SH-01",
+   "severe_VE-01",
+   "severe_NC-01",
+   "policy_b_other",
+   "case_type",
+   "harm_outcome",
+   "severity_direct",
+   "factor_scope",
+   "factor_reversibility",
+   "factor_sensitive_data",
+   "factor_external_action",
+   "factor_user_approved",
+   "factor_recurrence",
+   "evidence_support"
+  ]
+ },
+ "questions": {
+  "case_type": {
+   "type": "choice",
+   "runs_on": "free_text_channels",
+   "instructions": "What kind of intake is this? Judge by what the sender is asking for or reporting.",
+   "criteria": {
+    "harm_report": "Someone reports that something harmful happened or may have happened (a user, customer, reviewer, researcher, partner organisation or police tip).",
+    "complaint_appeal": "Someone disputes a refusal, removed content or an action taken against their account.",
+    "product_issue": "A defect, outage, slowness or UX problem with no harm claimed.",
+    "inquiry": "A question, feature request or 'is this allowed?'.",
+    "legal_request": "Formal legal process or a regulator's request: data requests, court orders, emergency disclosure requests, regulator inquiries, preservation letters.",
+    "detection_alert": "An automated detector or telemetry alert."
+   }
+  },
+  "policy_a": {
+   "type": "choice",
+   "runs_on": "all",
+   "instructions": "Which policy area does this AI incident report concern? Choose the topic of the conduct or content, regardless of whether harm occurred, whether the AI refused, or who reported it. Choose NP-00 only when no policy area is involved.",
+   "criteria": {
+    "CS-01": "Minors in a sexual, exploitative or endangering context, including refused attempts, unverified reports and appeals about them. Not general parenting or online-safety advice.",
+    "WP-01": "Chemical, biological, radiological or nuclear weapons, including refused requests, detector flags in this area and complaints about such refusals.",
+    "SH-01": "Self-harm or suicide: risky responses, a user at risk who was failed, or complaints about crisis responses.",
+    "VE-01": "Violent extremist groups or propaganda, credible threats of violence against people or places, or incitement.",
+    "NC-01": "Intimate, sexual or deceptive synthetic media (images, video, voice) of real, identifiable people, including appeals about removed synthetic media.",
+    "CY-01": "Help building malware, intrusion tools or other offensive cyber operations, including dual-use security tooling.",
+    "IO-01": "Coordinated, deceptive campaigns using many accounts or personas to manipulate opinion or elections. Not one person asking what is allowed.",
+    "FR-01": "Scams, phishing, impersonation or fraud carried out with the product. Not users asking how to spot scams.",
+    "JB-01": "A technique that gets the model to ignore its safety training, including claimed bypasses that did not work.",
+    "PI-01": "Instructions hidden in a document, web page or email that steer the model or agent against the user.",
+    "MS-01": "System prompts, credentials, API keys, secrets or model internals exposed.",
+    "DL-01": "Customer or company data reaching people outside its intended audience, including other tenants or external parties.",
+    "PR-01": "Personal information about a specific person revealed, retained, looked up or inferred, including refused lookups.",
+    "AG-01": "An agent acting beyond what the user asked or approved: files, payments, purchases, messages, settings.",
+    "HI-01": "The assistant stated wrong information as fact, in any domain, from trivial errors to high-stakes medical, legal or financial errors.",
+    "BD-01": "Unfair treatment or outputs based on protected characteristics such as gender, ethnicity or religion.",
+    "EA-01": "A dispute about a refusal, suspension or enforcement action in an everyday (non-severe) area.",
+    "PF-01": "A defect, error, outage or behaviour regression with no policy topic involved.",
+    "NP-00": "No policy area: questions, feature requests, UX feedback, expected behaviour, or legal process with no product-harm claim."
+   }
+  },
+  "severe_CS-01": {
+   "type": "choice",
+   "runs_on": "all",
+   "instructions": "Does this report concern minors in a sexual, exploitative or endangering context, even if the AI refused, a detector was wrong, or the report is unverified?",
+   "criteria": {
+    "yes": "The report's topic involves minors in a sexual, exploitative or endangering context.",
+    "no": "The report's topic does not involve minors in a sexual, exploitative or endangering context."
+   }
+  },
+  "severe_WP-01": {
+   "type": "choice",
+   "runs_on": "all",
+   "instructions": "Does this report concern chemical, biological, radiological or nuclear weapons, even if the AI refused, a detector was wrong, or the report is unverified?",
+   "criteria": {
+    "yes": "The report's topic involves chemical, biological, radiological or nuclear weapons.",
+    "no": "The report's topic does not involve chemical, biological, radiological or nuclear weapons."
+   }
+  },
+  "severe_SH-01": {
+   "type": "choice",
+   "runs_on": "all",
+   "instructions": "Does this report concern self-harm or suicide, even if the AI refused, a detector was wrong, or the report is unverified?",
+   "criteria": {
+    "yes": "The report's topic involves self-harm or suicide.",
+    "no": "The report's topic does not involve self-harm or suicide."
+   }
+  },
+  "severe_VE-01": {
+   "type": "choice",
+   "runs_on": "all",
+   "instructions": "Does this report concern violent extremism or credible threats of violence, even if the AI refused, a detector was wrong, or the report is unverified?",
+   "criteria": {
+    "yes": "The report's topic involves violent extremism or credible threats of violence.",
+    "no": "The report's topic does not involve violent extremism or credible threats of violence."
+   }
+  },
+  "severe_NC-01": {
+   "type": "choice",
+   "runs_on": "all",
+   "instructions": "Does this report concern intimate or deceptive synthetic media of real people, even if the AI refused, a detector was wrong, or the report is unverified?",
+   "criteria": {
+    "yes": "The report's topic involves intimate or deceptive synthetic media of real people.",
+    "no": "The report's topic does not involve intimate or deceptive synthetic media of real people."
+   }
+  },
+  "policy_b_other": {
+   "type": "choice",
+   "runs_on": "all",
+   "instructions": "Setting aside child safety, CBRN weapons, self-harm, violent extremism and synthetic media of real people: which policy area does this report concern? Choose the topic regardless of whether harm occurred.",
+   "criteria": {
+    "CY-01": "Help building malware, intrusion tools or other offensive cyber operations, including dual-use security tooling.",
+    "IO-01": "Coordinated, deceptive campaigns using many accounts or personas to manipulate opinion or elections. Not one person asking what is allowed.",
+    "FR-01": "Scams, phishing, impersonation or fraud carried out with the product. Not users asking how to spot scams.",
+    "JB-01": "A technique that gets the model to ignore its safety training, including claimed bypasses that did not work.",
+    "PI-01": "Instructions hidden in a document, web page or email that steer the model or agent against the user.",
+    "MS-01": "System prompts, credentials, API keys, secrets or model internals exposed.",
+    "DL-01": "Customer or company data reaching people outside its intended audience, including other tenants or external parties.",
+    "PR-01": "Personal information about a specific person revealed, retained, looked up or inferred, including refused lookups.",
+    "AG-01": "An agent acting beyond what the user asked or approved: files, payments, purchases, messages, settings.",
+    "HI-01": "The assistant stated wrong information as fact, in any domain, from trivial errors to high-stakes medical, legal or financial errors.",
+    "BD-01": "Unfair treatment or outputs based on protected characteristics such as gender, ethnicity or religion.",
+    "EA-01": "A dispute about a refusal, suspension or enforcement action in an everyday (non-severe) area.",
+    "PF-01": "A defect, error, outage or behaviour regression with no policy topic involved.",
+    "NP-00": "No policy area: questions, feature requests, UX feedback, expected behaviour, or legal process with no product-harm claim."
+   }
+  },
+  "harm_outcome": {
+   "type": "choice",
+   "runs_on": "all",
+   "instructions": "Based on the evidence, what actually happened?",
+   "criteria": {
+    "occurred": "The reported problem happened: harmful output, harmful action, data exposure or a real defect.",
+    "attempted_blocked": "Something was attempted but refused or blocked, or a request was refused.",
+    "repeated_attempts": "A pattern of repeated attempts, all refused or blocked.",
+    "false_alarm": "The report or detector was wrong: on review there was no violation.",
+    "unverified": "A claim that no system record supports yet.",
+    "none_claimed": "No harm is claimed (a question or feedback)."
+   }
+  },
+  "severity_direct": {
+   "type": "score",
+   "runs_on": "all",
+   "instructions": "How severe is this incident? Weigh whether harm occurred, potential impact, how many people or organisations are affected, whether it can be undone, data sensitivity and evidence strength. Uncorroborated reports of potentially severe harm should not be rated low just because evidence is missing.",
+   "levels": [
+    "P3 Low: confusion, questions, duplicates, cosmetic issues, or no evidence of harm.",
+    "P2 Medium: material impact on one user or a recurring product issue; reversible.",
+    "P1 High: serious trust, privacy, security, safety or agent-control risk; or an unverified report of potentially severe harm.",
+    "P0 Critical: credible immediate safety risk, confirmed severe harmful content, or confirmed severe or broad data exposure."
+   ]
+  },
+  "factor_scope": {
+   "type": "choice",
+   "runs_on": "all",
+   "state": "masked",
+   "instructions": "How many people or organisations are affected? Answer from the report text and evidence.",
+   "criteria": {
+    "single_user": "One user.",
+    "multiple_users": "Several users.",
+    "workspace": "A whole workspace or organisation.",
+    "multiple_customers": "Several customers or organisations.",
+    "unknown": "The report does not say."
+   }
+  },
+  "factor_reversibility": {
+   "type": "choice",
+   "runs_on": "all",
+   "state": "masked",
+   "instructions": "Can the effect be undone? Answer from the report text and evidence.",
+   "criteria": {
+    "reversible": "Yes, it can be undone.",
+    "partially_reversible": "Partly.",
+    "irreversible": "No: data exposed, money spent, messages sent or content distributed.",
+    "unknown": "The report does not say."
+   }
+  },
+  "factor_sensitive_data": {
+   "type": "choice",
+   "runs_on": "all",
+   "state": "masked",
+   "instructions": "Is sensitive data involved (personal data, credentials, confidential business data)? Answer from the report text and evidence.",
+   "criteria": {
+    "yes": "Yes, clearly.",
+    "possible": "Possibly.",
+    "no": "No.",
+    "unknown": "The report does not say."
+   }
+  },
+  "factor_external_action": {
+   "type": "choice",
+   "runs_on": "all",
+   "state": "masked",
+   "instructions": "Did the AI take an action outside the conversation (send, buy, delete, change settings)? Answer from the report text and evidence.",
+   "criteria": {
+    "yes": "Yes.",
+    "no": "No.",
+    "unknown": "The report does not say."
+   }
+  },
+  "factor_user_approved": {
+   "type": "choice",
+   "runs_on": "all",
+   "state": "masked",
+   "instructions": "Did the user approve the AI's action? Answer from the report text and evidence.",
+   "criteria": {
+    "yes": "Yes, the user approved it.",
+    "no": "No, it happened without approval.",
+    "unknown": "Not stated, or no action was taken."
+   }
+  },
+  "factor_recurrence": {
+   "type": "choice",
+   "runs_on": "all",
+   "state": "masked",
+   "instructions": "Is this a first report or a repeating pattern? Answer from the report text and evidence.",
+   "criteria": {
+    "first_report": "A single occurrence or first report.",
+    "repeated": "Repeated or a pattern.",
+    "unknown": "The report does not say."
+   }
+  },
+  "evidence_support": {
+   "type": "choice",
+   "runs_on": "claims",
+   "instructions": "How far do the attached system records support what the report claims? A claim from an authority is still a claim until system records support it.",
+   "criteria": {
+    "supported": "System records (logs, classifier output, specialist review, telemetry) back the report.",
+    "partly": "Some support, or support only from an outside party.",
+    "contradicted": "The evidence contradicts the report.",
+    "claim_only": "Only the reporter's own statement.",
+    "no_claim": "Nothing is claimed (a question or feedback)."
+   }
+  }
+ }
+}

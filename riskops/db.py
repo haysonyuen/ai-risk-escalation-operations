@@ -156,6 +156,23 @@ CREATE TABLE IF NOT EXISTS claim_reviews (
     reviewed_at TEXT NOT NULL,
     note TEXT
 );
+-- Phase 1 Jev shadow answers. Written by riskops.shadow, read only by the admin-only shadow views;
+-- rules, workflow decisions and assessments never read this table (enforced by a test).
+CREATE TABLE IF NOT EXISTS shadow_results (
+    shadow_id TEXT PRIMARY KEY,
+    incident_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT,
+    question_version TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    result_json TEXT,
+    latency_ms REAL,
+    input_tokens INTEGER,
+    cost_usd REAL,
+    error_kind TEXT,
+    error TEXT
+);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -176,6 +193,8 @@ DEFAULT_SETTINGS = {
     "active_prompt_version": "prompt-v3",
     "provider_mode": "offline",
     "quality_baseline_run_id": "",
+    "jev_shadow": "on",      # Phase 1: record Jev shadow answers when TYPESAFE_API_KEY is set
+    "jev_variant": "A",
 }
 
 

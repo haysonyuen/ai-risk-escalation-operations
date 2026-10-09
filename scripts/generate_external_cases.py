@@ -62,7 +62,7 @@ def case(title, behavior, *, channel, surface="chat_app", customer="consumer", i
         "acceptable_routes": list(routes or [route]), "requires_mandatory_review": review,
         "expected_categories": list(cats), "auto_hold_expected": sev == "P0" and bool(AUTO_HOLD & set(cats)),
         "supporting_evidence_ids": list(support), "label_rationale": rationale, "ambiguity_notes": ambiguity,
-        "related_group": None, "label_status": "draft-awaiting-owner-review",
+        "related_group": None, "label_status": "author-label-not-owner-reviewed",
         "case_type": case_type, "harm_outcome": outcome, "harm_outcome_also_ok": list(outcome_ok),
         "evidence_supports_claim": ev_support,
     })

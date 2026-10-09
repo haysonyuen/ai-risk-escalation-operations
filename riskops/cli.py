@@ -4,6 +4,7 @@
   python -m riskops.cli eval --system rules --rules rules-v2.0 --split dev
   python -m riskops.cli eval --system live --rules rules-v2.1 --prompt prompt-v3 --split dev
   python -m riskops.cli eval --system fault:under_severity --rules rules-v2.1 --split all
+  python -m riskops.cli jev-eval --split dev --variant A --repeats 3 [--llm-run <run_dir>]
   python -m riskops.cli compare <run_dir> <run_dir> ...
   python -m riskops.cli claims <run_dir>/claim_review_worksheet.csv
 """
@@ -32,6 +33,13 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--split", default="dev", choices=["dev", "held_out", "all", "external"])
     e.add_argument("--label", default=None)
     e.add_argument("--record-in-db", action="store_true", help="also record the run summary in the app database")
+
+    j = sub.add_parser("jev-eval", help="Phase 1: evaluate Jev in shadow mode")
+    j.add_argument("--split", default="dev", choices=["dev", "held_out", "all", "external"])
+    j.add_argument("--variant", default="A", choices=["A", "B"])
+    j.add_argument("--repeats", type=int, default=3)
+    j.add_argument("--llm-run", default=None, help="live LLM evaluation run directory on the same split, for comparison")
+    j.add_argument("--label", default=None)
 
     c = sub.add_parser("compare", help="compare run directories")
     c.add_argument("runs", nargs="+")
@@ -62,6 +70,16 @@ def main(argv: list[str] | None = None) -> int:
               f"P0/P1 precision {evaluation._fmt(m['p0p1_precision'])}; review compliance "
               f"{evaluation._fmt(summary['metrics']['mandatory_review']['compliance_flagged_when_required'])}; "
               f"failures {len(summary['failures'])}")
+        return 0
+    if args.cmd == "jev-eval":
+        from . import jev_eval
+        try:
+            s = jev_eval.run(args.split, args.variant, args.repeats, args.llm_run, label=args.label)
+        except jev_eval.JevUnavailable as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(f"run: {s['run_id']}\nartifacts: {s.get('artifact_dir')}")
+        print("PASS" if s["passed"] else "NOT PASSED", "|", "; ".join(f"{c['id']}={c['value']}" for c in s["criteria"]))
         return 0
     if args.cmd == "compare":
         sums = [json.loads((Path(r) / "summary.json").read_text()) for r in args.runs]

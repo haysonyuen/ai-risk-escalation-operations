@@ -356,7 +356,21 @@ def run_assessment(conn, incident_id: str, provider, actor: Actor = SYSTEM_ACTOR
                   new=rec["controlled_severity"], reason="New AI recommendation differs; human decision unchanged",
                   origin=origin, ts=ts)
     conn.commit()
+    _record_jev_shadow(conn, incident_id)
     return rec
+
+
+def _record_jev_shadow(conn, incident_id: str) -> None:
+    """Phase 1 shadow mode: when Jev is configured, record its answers for this case. Write-only:
+    nothing in the workflow reads them back, and a Jev failure never affects case handling."""
+    from .providers import jev
+    if not jev.credentials_available() or get_setting(conn, "jev_shadow") != "on":
+        return
+    from . import shadow
+    try:
+        shadow.record(conn, shadow.run_case(get_intake(conn, incident_id), get_setting(conn, "jev_variant")))
+    except Exception:  # noqa: BLE001 - shadow mode must never break assessment
+        conn.rollback()
 
 
 # ---------------------------------------------------------------------------------------

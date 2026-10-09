@@ -10,6 +10,13 @@ from riskops.schemas import IncidentIntake
 ACTORS = {a.actor_id: a for a in wf.SIMULATED_ACTORS}
 
 
+@pytest.fixture(autouse=True)
+def _no_live_providers(monkeypatch):
+    """Tests never call Jev or Anthropic, even when the developer's shell has keys set."""
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+
 @pytest.fixture
 def conn(tmp_path):
     c = connect(tmp_path / "test.db")

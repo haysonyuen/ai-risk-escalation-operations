@@ -77,10 +77,13 @@ def load_phase1_labels() -> dict[str, dict]:
     """Phase 1 labels (case type, harm outcome, evidence support) for every eval case: the
     supplementary file for eval-v2, and the external split's own labels."""
     keys = ("case_type", "harm_outcome", "harm_outcome_also_ok", "evidence_supports_claim")
+    # also_acceptable_categories: policy readings accepted in addition to expected_categories
     out = {}
     for line in _jsonl(config.EVAL_DIR / "phase1_labels.jsonl") + _jsonl(EXTERNAL_DIR / "labels.jsonl"):
         lab = json.loads(line)
-        out[lab["incident_id"]] = {k: lab.get(k) for k in keys} | {"convention_question": lab.get("convention_question", "")}
+        out[lab["incident_id"]] = {k: lab.get(k) for k in keys} | {
+            "convention_question": lab.get("convention_question", ""),
+            "also_acceptable_categories": lab.get("also_acceptable_categories", [])}
     return out
 
 
